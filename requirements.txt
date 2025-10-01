@@ -4,3 +4,4 @@ numpy
 scitkit-learn
 fastapi
 uvicorn
+pytest
