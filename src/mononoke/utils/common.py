@@ -1,6 +1,6 @@
 import os 
 import yaml
-from src.datascience_project import logger
+from src.mononoke import logger
 import json
 import joblib
 from box import ConfigBox
