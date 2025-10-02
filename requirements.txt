@@ -1,7 +1,13 @@
 mlflow 
 pandas
 numpy
-scitkit-learn
+scikit-learn
 fastapi
 uvicorn
 pytest
+requests
+ipykernel
+python-box
+ensure
+pyYAML
+joblib
