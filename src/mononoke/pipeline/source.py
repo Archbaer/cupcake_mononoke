@@ -2,18 +2,7 @@ import os
 import requests
 from typing import Optional, Dict, Any
 from src.mononoke import logger
-from datetime import datetime  
-from dataclasses import dataclass
-
-@dataclass 
-class MarketData:
-    """
-    Standardize market data format for class output.
-    """
-    symbol: str
-    price: float
-    volume: str
-    timestamp: datetime
+from datetime import datetime
 
 class QueryAlphaVantage:
     """
@@ -96,8 +85,8 @@ class QueryAlphaVantage:
 
         if any(k in data for k in ("Error Message", "Note", "Information")):
             msg = data.get("Error Message") or data.get("Note") or data.get("Information")
-            logger.error(f"Alpha Vantage error for forex {from_currency}->{to_currency}: {msg}")
-            raise Exception(f"Alpha Vantage error for forex {from_currency}->{to_currency}: {msg}")
+            logger.error(f"Alpha Vantage error for Exchange rate {from_currency}->{to_currency}: {msg}")
+            raise Exception(f"Alpha Vantage error for Exchange rate {from_currency}->{to_currency}: {msg}")
 
         # Validate expected structure for this endpoint
         if "Realtime Currency Exchange Rate" not in data:
@@ -105,4 +94,127 @@ class QueryAlphaVantage:
             raise Exception(f"Unexpected response structure for {from_currency}->{to_currency}")
 
         logger.info(f"Data fetched successfully for {from_currency} to {to_currency}")
+        return data
+
+    def get_daily_stock_data(self, symbol: str, outputsize: str) -> Dict[str, Any]:
+        """
+        Fetch daily stock data from Alpha Vantage API.
+
+        Args:
+            symbol (str): The stock symbol to fetch (e.g., 'AAPL', 'MSFT').
+            outputsize (str): The size of the output data (e.g., 'compact', 'full').
+                'compact' returns the latest 100 data points.
+                'full' returns the full-length time series of 20+ years of historical data.
+
+        Returns:
+            Dict[str, Any]: The JSON response from the API.
+        """
+        
+        params = {
+            "function": "TIME_SERIES_DAILY",
+            "symbol": symbol,
+            "outputsize": outputsize,
+            "apikey": self.api_key
+        }
+
+        res = requests.get(self.base_url, params=params)
+
+        try:
+            data = res.json()
+        except ValueError:
+            logger.error("Alpha Vantage returned non-JSON response.")
+            raise Exception("Alpha Vantage returned non-JSON response.")
+        
+        if res.status_code != 200:
+            logger.error(f"HTTP error fetching stock data for {symbol}: {res.status_code} - {res.text}")
+            raise Exception(f"HTTP error fetching stock data for {symbol}: {res.status_code} - {res.text}")
+        
+        if any(k in data for k in ("Error Message", "Note", "Information")):
+            msg = data.get("Error Message") or data.get("Note") or data.get("Information")
+            logger.error(f"Alpha Vantage error for stock {symbol}: {msg}")
+            raise Exception(f"Alpha Vantage error for stock {symbol}: {msg}")
+        
+        logger.info(f"Data fetched successfully for stock {symbol}")
+        return data
+    
+    def get_daily_crypto_data(self, symbol: str, market: str) -> Dict[str, Any]:
+        """
+        Fetch daily cryptocurrency data from Alpha Vantage API.
+
+        Args:
+            symbol (str): The cryptocurrency symbol to fetch (e.g., 'BTC', 'ETH').
+            market (str): The market currency (e.g., 'USD', 'EUR').
+        
+        Returns:
+            Dict[str, Any]: The JSON response from the API.
+        """
+
+        params = {
+            "function": "DIGITAL_CURRENCY_DAILY",
+            "symbol": symbol,
+            "market": market,
+            "apikey": self.api_key  
+        }
+
+        res = requests.get(self.base_url, params=params)
+
+        try:
+            data = res.json()
+        except ValueError:
+            logger.error("Alpha Vantage returned non-JSON response.")
+            raise Exception("Alpha Vantage returned non-JSON response.")
+        
+        if res.status_code != 200:
+            logger.error(f"HTTP error fetching crypto data for {symbol}: {res.status_code} - {res.text}")
+            raise Exception(f"HTTP error fetching crypto data for {symbol}: {res.status_code} - {res.text}")
+
+        if any(k in data for k in ("Error Message", "Note", "Information")):
+            msg = data.get("Error Message") or data.get("Note") or data.get("Information")
+            logger.error(f"Alpha Vantage error for crypto {symbol}: {msg}")
+            raise Exception(f"Alpha Vantage error for crypto {symbol}: {msg}")
+
+        logger.info(f"Data fetched successfully for crypto {symbol}")
+        return data
+
+    def get_forex_daily(self, from_symbol: str, to_symbol: str, outputsize: str) -> Dict[str, Any]:
+        """
+        Fetch daily forex data from Alpha Vantage API.
+
+        Args:
+            from_symbol (str): The base currency symbol (e.g., 'USD', 'EUR').
+            to_symbol (str): The target currency symbol (e.g., 'JPY', 'GBP').
+            outputsize (str): The size of the output data (e.g., 'compact', 'full').
+                'compact' returns the latest 100 data points.
+                'full' returns the full-length time series of 20+ years of historical data.
+
+        Returns:
+            Dict[str, Any]: The JSON response from the API. 
+        """
+
+        params = {
+            "function": "FX_DAILY",
+            "from_symbol": from_symbol,
+            "to_symbol": to_symbol,
+            "outputsize": outputsize,
+            "apikey": self.api_key
+        }
+
+        res = requests.get(self.base_url, params=params)
+
+        try:
+            data = res.json()
+        except ValueError:
+            logger.error("Alpha Vantage returned non-JSON response.")
+            raise Exception("Alpha Vantage returned non-JSON response.")
+        
+        if res.status_code != 200:
+            logger.error(f"HTTP error fetching Forex data for {from_symbol}->{to_symbol}: {res.status_code} - {res.text}")
+            raise Exception(f"HTTP error fetching Forex data for {from_symbol}->{to_symbol}: {res.status_code} - {res.text}")
+
+        if any(k in data for k in ("Error Message", "Note", "Information")):
+            msg = data.get("Error Message") or data.get("Note") or data.get("Information")
+            logger.error(f"Alpha Vantage error for Forex {from_symbol}->{to_symbol}: {msg}")
+            raise Exception(f"Alpha Vantage error for Forex {from_symbol}->{to_symbol}: {msg}")
+
+        logger.info(f"Data fetched successfully for Forex {from_symbol} to {to_symbol}")
         return data
