@@ -1,4 +1,3 @@
-import os 
 import requests
 from typing import Optional, Dict, Any
 from src.mononoke import logger

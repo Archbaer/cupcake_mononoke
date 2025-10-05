@@ -6,7 +6,7 @@ import joblib
 from box import ConfigBox
 from ensure import ensure_annotations
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable, Union
 from box.exceptions import BoxValueError
 
 @ensure_annotations
@@ -31,15 +31,14 @@ def read_yaml(path_to_yaml: Path) -> ConfigBox:
         logger.error(f"Error reading YAML file at {path_to_yaml}: {e}")
         raise e
 
-@ensure_annotations
-def create_directories(path_to_directories: list[Path]) -> None:
+def create_directories(paths: Iterable[Union[str, Path]]) -> None:
     """Creates directories if they do not exist.
     
     Args:
-        path_to_directories (list[Path]): List of directory paths to create.
+        paths (list[Path]): List of directory paths to create.
     """
-    for path in path_to_directories:
-        os.makedirs(path, exist_ok=True)
+    for path in paths:
+        Path(path).mkdir(parents=True, exist_ok=True)
         logger.info(f"Directory created at: {path}")
 
 @ensure_annotations
