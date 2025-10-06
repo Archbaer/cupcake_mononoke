@@ -1,3 +1,15 @@
 from src.mononoke import logger
+from src.mononoke.pipeline.extract import Extract
+from pathlib import Path
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
+api_key = os.getenv("ALPHA_VANTAGE")
 
 logger.info("Starting the application...")
+
+extractor = Extract(api_key=api_key)
+exchange_currency_pairs = [("USD", "INR"), ("EUR", "USD"), ("GBP", "USD")]
+
+extractor.exchange_rate_extract(currency_pairs=exchange_currency_pairs)

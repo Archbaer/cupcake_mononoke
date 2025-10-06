@@ -1,109 +1,61 @@
-import os 
-import yaml
-from src.mononoke import logger
+import os
 import json
-import joblib
-from box import ConfigBox
-from ensure import ensure_annotations
+import yaml
+import tempfile
 from pathlib import Path
 from typing import Any, Iterable, Union
+import joblib
+
+from src.mononoke import logger
+from box import ConfigBox
 from box.exceptions import BoxValueError
 
-@ensure_annotations
 def read_yaml(path_to_yaml: Path) -> ConfigBox:
-    """Reads a yaml file and returns the contents as a ConfigBox object.
-    
-    Args:
-        path_to_yaml (Path): Path to the yaml file.
-
-    Returns:
-        ConfigBox: Contents of the yaml file as a ConfigBox object.
-    """
+    """Read YAML and return a ConfigBox."""
     try:
-        with open(path_to_yaml, 'r') as file:
-            content = yaml.safe_load(file)
-            logger.info(f"yaml file: {path_to_yaml} loaded successfully")
-            return ConfigBox(content)
+        with open(path_to_yaml, "r", encoding="utf-8") as fh:
+            content = yaml.safe_load(fh) or {}
+        logger.info(f"yaml file: {path_to_yaml} loaded successfully")
+        return ConfigBox(content)
     except BoxValueError as e:
         logger.error(f"BoxValueError: {e}")
         raise ValueError("Yaml file is empty")
     except Exception as e:
         logger.error(f"Error reading YAML file at {path_to_yaml}: {e}")
-        raise e
+        raise
 
 def create_directories(paths: Iterable[Union[str, Path]]) -> None:
-    """Creates directories if they do not exist.
-    
-    Args:
-        paths (list[Path]): List of directory paths to create.
-    """
-    for path in paths:
-        Path(path).mkdir(parents=True, exist_ok=True)
-        logger.info(f"Directory created at: {path}")
+    """Ensure each path exists. Accepts str or Path."""
+    for p in paths:
+        Path(p).mkdir(parents=True, exist_ok=True)
+        logger.info(f"Directory created at: {Path(p)}")
 
-@ensure_annotations
-def save_json(path: Path, data: dict[str, Any]) -> None:
-    """Saves a dictionary as a JSON file.
-    
-    Args:
-        path (Path): Path to save the JSON file.
-        data (dict[str, Any]): Dictionary to save as JSON.
-    """
-    try:
-        with open(path, 'w') as file:
-            json.dump(data, file, indent=4)
-        logger.info(f"JSON file saved at: {path}")
-    except Exception as e:
-        logger.error(f"Error saving JSON file at {path}: {e}")
-        raise e
-    
-@ensure_annotations
-def load_json(path: Path) -> dict[str, Any]:
-    """Loads a JSON file and returns its contents as a dictionary.
-    
-    Args:
-        path (Path): Path to the JSON file.
+def save_json(path: Path, data: Any) -> None:
+    """Save JSON atomically. Accepts any JSON-serializable data."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # write to temp file on same directory then atomically replace
+    with tempfile.NamedTemporaryFile("w", delete=False, dir=str(path.parent), encoding="utf-8") as tf:
+        json.dump(data, tf, ensure_ascii=False, indent=2)
+        tf.flush()
+        os.fsync(tf.fileno())
+        tmp_name = tf.name
+    os.replace(tmp_name, str(path))
+    logger.info(f"JSON file saved at: {path}")
 
-    Returns:
-        dict[str, Any]: Contents of the JSON file as a dictionary.
-    """
-    try:
-        with open(path, 'r') as file:
-            content = json.load(file)
-            logger.info(f"JSON file loaded successfully from: {path}")
-            return ConfigBox(content)
-    except Exception as e:
-        logger.error(f"Error loading JSON file from {path}: {e}")
-        raise e
-    
-@ensure_annotations
+def load_json(path: Path) -> Any:
+    """Load JSON file and return parsed content."""
+    path = Path(path)
+    with open(path, "r", encoding="utf-8") as fh:
+        return json.load(fh)
+
 def save_bin(data: Any, path: Path) -> None:
-    """Saves data as a binary file using joblib.
-    
-    Args:
-        data (Any): Data to save.
-        path (Path): Path to save the binary file.
-    """
-    try:
-        joblib.dump(data, path)
-        logger.info(f"Binary file saved at: {path}")
-    except Exception as e:
-        logger.error(f"Error saving binary file at {path}: {e}")
-        raise e
-    
-@ensure_annotations
-def load_bin(path: Path) -> Any:
-    """Loads a binary file using joblib and returns its contents.
-    
-    Args:
-        path (Path): Path to the binary file.
+    """Save binary via joblib."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(data, path)
+    logger.info(f"Binary file saved at: {path}")
 
-    Returns:
-        Any: Contents of the binary file.
-    """
-    try:
-        return joblib.load(path)
-    except Exception as e:
-        logger.error(f"Error loading binary file from {path}: {e}")
-        raise e
-    
+def load_bin(path: Path) -> Any:
+    """Load binary via joblib."""
+    return joblib.load(path)
