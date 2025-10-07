@@ -2,6 +2,7 @@ import requests
 from typing import Optional, Dict, Any
 from src.mononoke import logger
 from datetime import datetime
+import yfinance as yf
 
 class QueryAlphaVantage:
     """
@@ -217,3 +218,45 @@ class QueryAlphaVantage:
 
         logger.info(f"Data fetched successfully for Forex {from_symbol} to {to_symbol}")
         return data
+    
+class QueryYahooFinance:
+    """
+    Class to query Yahoo Finance for market data.
+    """
+    def __init__(self):
+        pass
+
+    def get_info(self, symbol: str) -> Dict[str, Any]:
+        """
+        Fetch stock information from Yahoo Finance.
+
+        Args:
+            symbol (str): The stock symbol to fetch (e.g., 'AAPL', 'MSFT').
+        """
+        try:
+            ticker = yf.Ticker(symbol)
+            info = ticker.info
+            logger.info(f"Data fetched successfully for stock {symbol} from Yahoo Finance")
+            return info
+        except Exception as e:
+            logger.error(f"Error fetching stock data for {symbol} from Yahoo Finance: {e}")
+            raise Exception(f"Error fetching stock data for {symbol} from Yahoo Finance: {e}")
+        
+    def get_financial_summary(self, symbol: str) -> Dict[str, Any]:
+        """
+        Fetch financial summary data from Yahoo Finance.
+
+        Args:
+            symbol (str): The stock symbol to fetch (e.g., 'AAPL', 'MSFT').
+        """
+        try:
+            ticker = yf.Ticker(symbol)
+            financials = ticker.financials
+            financials_dict = financials.to_dict()
+            logger.info(f"Financial summary fetched successfully for stock {symbol} from Yahoo Finance")
+            return financials_dict
+        except Exception as e:
+            logger.error(f"Error fetching financial summary for {symbol} from Yahoo Finance: {e}")
+            raise Exception(f"Error fetching financial summary for {symbol} from Yahoo Finance: {e}")
+        
+    
