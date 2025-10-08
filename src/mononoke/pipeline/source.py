@@ -252,9 +252,10 @@ class QueryYahooFinance:
         try:
             ticker = yf.Ticker(symbol)
             financials = ticker.financials
+            information = ticker.info
             financials_dict = financials.to_dict()
             logger.info(f"Financial summary fetched successfully for stock {symbol} from Yahoo Finance")
-            return financials_dict
+            return financials_dict, information
         except Exception as e:
             logger.error(f"Error fetching financial summary for {symbol} from Yahoo Finance: {e}")
             raise Exception(f"Error fetching financial summary for {symbol} from Yahoo Finance: {e}")
