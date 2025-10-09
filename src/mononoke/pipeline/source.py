@@ -225,22 +225,6 @@ class QueryYahooFinance:
     """
     def __init__(self):
         pass
-
-    def get_info(self, symbol: str) -> Dict[str, Any]:
-        """
-        Fetch stock information from Yahoo Finance.
-
-        Args:
-            symbol (str): The stock symbol to fetch (e.g., 'AAPL', 'MSFT').
-        """
-        try:
-            ticker = yf.Ticker(symbol)
-            info = ticker.info
-            logger.info(f"Data fetched successfully for stock {symbol} from Yahoo Finance")
-            return info
-        except Exception as e:
-            logger.error(f"Error fetching stock data for {symbol} from Yahoo Finance: {e}")
-            raise Exception(f"Error fetching stock data for {symbol} from Yahoo Finance: {e}")
         
     def get_financial_summary(self, symbol: str) -> Dict[str, Any]:
         """
