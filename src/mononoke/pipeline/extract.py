@@ -1,5 +1,5 @@
 from src.mononoke.utils.common import create_directories, save_json
-from src.mononoke.pipeline.source import QueryAlphaVantage
+from src.mononoke.pipeline.source import QueryAlphaVantage, QueryYahooFinance
 from src.mononoke import logger
 from pathlib import Path
 
@@ -97,3 +97,28 @@ class Extract:
             logger.info(f"Forex data for {from_symbol} to {to_symbol} saved to {file_path}")
         except Exception as e:
             logger.error(f"Failed to extract/save forex data for {from_symbol} to {to_symbol}: {e}")
+
+    def extract_yahoo_financials(self, symbols: list[str]) -> None:
+        """
+        Extract financial summary data for a given stock symbol from Yahoo Finance and save as JSON files.
+
+        Args:
+            symbols (list[str]): Stock symbols to fetch (e.g., ['AAPL', 'MSFT']).
+        """
+        yahoo = QueryYahooFinance()
+        for symbol in symbols:
+            try:
+                financials, info = yahoo.get_financial_summary(symbol=symbol)
+
+                financials_path = self.raw_data_dir / "yahoo_financials" / f"{symbol}_financials.json"
+                info_path = self.raw_data_dir / "yahoo_financials" / f"{symbol}_info.json"
+                
+                financials = {str(k): v for k, v in financials.items()}
+                info = {str(k): v for k, v in info.items()} 
+                
+                save_json(financials_path, financials)
+                save_json(info_path, info)
+
+                logger.info(f"Yahoo Finance data for {symbol} saved to {financials_path} and {info_path}")
+            except Exception as e:
+                logger.error(f"Failed to extract/save Yahoo Finance data for {symbol}: {e}")

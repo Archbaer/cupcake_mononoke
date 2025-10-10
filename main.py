@@ -10,8 +10,6 @@ api_key = os.getenv("ALPHA_VANTAGE")
 
 logger.info("Starting the application...")
 
-yahoo = QueryYahooFinance()
+extract = Extract(api_key=api_key)
 
-microsoft_financials, microsoft_info = yahoo.get_financial_summary("MSFT")
-print(microsoft_info)
-print(microsoft_financials)
+extract.extract_yahoo_financials(symbols=["AAPL", "MSFT"])
