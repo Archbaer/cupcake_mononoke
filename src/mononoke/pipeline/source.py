@@ -16,13 +16,13 @@ class QueryAlphaVantage:
             raise ValueError("API key for Alpha Vantage is required.")
         self.base_url = "https://www.alphavantage.co/query"
 
-    def get_commodities_data(self, commodity: str, interval: Optional[str] = "monthly") -> Dict[str, Any]:
+    def get_commodity_data(self, commodity: str, interval: Optional[str] = "monthly") -> Dict[str, Any]:
         """
-        Fetch commodities data from Alpha Vantage API.
+        Fetch commodity data from Alpha Vantage API.
         
         Args:
             commodity (str): The commodity to fetch (e.g., 'COPPER'). 
-                Available commodities list: ['SUGAR', 'COFFEE', 'WTI', 'BRENT', 'COPPER', 'NATURAL_GAS', 'ALUMINUM', 'WHEAT', 'COTTON'].
+                Available commodity list: ['SUGAR', 'COFFEE', 'WTI', 'BRENT', 'COPPER', 'NATURAL_GAS', 'ALUMINUM', 'WHEAT', 'COTTON'].
             interval (Optional[str]): The interval for time series data (e.g., 'monthly').
 
         Returns:
