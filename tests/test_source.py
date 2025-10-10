@@ -10,11 +10,11 @@ def test_query_yahoo_finance():
     assert len(financials) > 0
     assert info["symbol"] == "AAPL"
 
-@pytest.fixture
-def alpha_api_key():
-    if not api_key:
-        pytest.skip("ALPHA_VANTAGE API key not set in environment variables.")
-    return api_key
+# @pytest.fixture
+# def alpha_api_key():
+#     if not api_key:
+#         pytest.skip("ALPHA_VANTAGE API key not set in environment variables.")
+#     return api_key
 
 
 def test_query_alpha_vantage(alpha_api_key):
