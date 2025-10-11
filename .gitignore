@@ -4,4 +4,5 @@ venv/
 logs/
 artifacts/
 __pycache__/
+notebooks/
 *.ipynb
