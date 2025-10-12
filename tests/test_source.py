@@ -1,5 +1,6 @@
 import os
 import pytest
+import yfinance as yf
 from src.mononoke.pipeline.source import QueryYahooFinance, QueryAlphaVantage
 
 api_key = os.getenv("ALPHA_VANTAGE")
@@ -39,4 +40,16 @@ def test_query_alpha_vantage(alpha_api_key):
     commodities = alpha.get_commodity_data(commodity='SUGAR')
     assert commodities['name'] == 'Global Price of Sugar'
 
+def test_query_yahoo_finance():
+    yahoo = QueryYahooFinance()
+    symbol = "AAPL"
+    ticker = yf.Ticker(symbol)
+    financials, info = yahoo.get_financial_summary(symbol)
+
+    assert len(financials) > 0
+    assert info["symbol"] == symbol
+
+    industry_info = yahoo.get_industry_data(symbol)
+
+    assert industry_info['industry'] == ticker.info.get('sectorKey')
     

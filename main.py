@@ -12,4 +12,6 @@ logger.info("Starting the application...")
 
 extract = Extract(api_key=api_key)
 
-extract.extract_yahoo_financials(symbols=["AAPL", "MSFT"])
+extract.commodities_extract(commodities=["SUGAR", "COFFEE", "WTI", "BRENT", "COPPER", "NATURAL_GAS", "ALUMINUM", "WHEAT", "COTTON"])
+
+extract.extract_yahoo_financials(symbols=["AAPL", "MSFT", "GOOGL", "AMZN"])

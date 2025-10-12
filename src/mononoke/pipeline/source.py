@@ -249,9 +249,9 @@ class QueryYahooFinance:
             logger.error(f"Error fetching financial summary for {symbol} from Yahoo Finance: {e}")
             raise Exception(f"Error fetching financial summary for {symbol} from Yahoo Finance: {e}")
 
-    def get_industry_top_companies(self, symbol: str) -> Dict[str, Any]:
+    def get_industry_data(self, symbol: str) -> Dict[str, Any]:
         """
-        Fetch industry top companies from Yahoo Finance.
+        Fetch industry data from Yahoo Finance.
 
         Args:
             symbol (str): The stock symbol to fetch (e.g., 'AAPL', 'MSFT').

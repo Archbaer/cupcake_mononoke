@@ -24,7 +24,7 @@ class Extract:
         """
         for commodity in commodities:
             try:
-                data = self.query_av.get_commodities_data(commodity=commodity)
+                data = self.query_av.get_commodity_data(commodity=commodity)
                 file_path = self.raw_data_dir / "commodities" / f"{commodity}.json"
                 save_json(file_path, data)
                 logger.info(f"Data for {commodity} saved to {file_path}")
@@ -109,16 +109,19 @@ class Extract:
         for symbol in symbols:
             try:
                 financials, info = yahoo.get_financial_summary(symbol=symbol)
+                industry_info = yahoo.get_industry_data(symbol=symbol)
 
                 financials_path = self.raw_data_dir / "yahoo_financials" / f"{symbol}_financials.json"
                 info_path = self.raw_data_dir / "yahoo_financials" / f"{symbol}_info.json"
-                
+                industry_info_path = self.raw_data_dir / "yahoo_financials" / f"{symbol}_industry_info.json"
+
                 financials = {str(k): v for k, v in financials.items()}
                 info = {str(k): v for k, v in info.items()} 
-                
+                                
                 save_json(financials_path, financials)
                 save_json(info_path, info)
+                save_json(industry_info_path, industry_info)
 
-                logger.info(f"Yahoo Finance data for {symbol} saved to {financials_path} and {info_path}")
+                logger.info(f"Yahoo Finance data for {symbol} saved to {financials_path}, {info_path}, and {industry_info_path}")
             except Exception as e:
                 logger.error(f"Failed to extract/save Yahoo Finance data for {symbol}: {e}")
