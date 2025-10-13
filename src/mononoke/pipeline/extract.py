@@ -47,39 +47,40 @@ class Extract:
             except Exception as e:
                 logger.error(f"Failed to extract/save exchange rate data for {from_currency} to {to_currency}: {e}")
 
-    def extract_stock(self, symbol: str, outputsize: str) -> None:
+    def extract_stock(self, symbols: list[str], outputsize: str) -> None:
         """
-        Extract stock data for a given symbol and save as a JSON file.
+        Extract stock data for given symbols and save as JSON files.
 
         Args:
-            symbol (str): Stock symbol to fetch (e.g., 'AAPL').
+            symbols (list[str]): List of stock symbols to fetch (e.g., ['AAPL', 'MSFT']).
             outputsize (str): The size of the data set to return ('compact' or 'full').
         """
-        try:
-            data = self.query_av.get_daily_stock_data(symbol=symbol, outputsize=outputsize)
-            file_path = self.raw_data_dir / "stocks" / f"{symbol}_stock_data.json"
-            save_json(file_path, data)
-            logger.info(f"Stock data for {symbol} saved to {file_path}")
-        except Exception as e:
-            logger.error(f"Failed to extract/save stock data for {symbol}: {e}")
+        for symbol in symbols:
+            try:
+                data = self.query_av.get_daily_stock_data(symbol=symbol, outputsize=outputsize)
+                file_path = self.raw_data_dir / "stocks" / f"{symbol}_stock_data.json"
+                save_json(file_path, data)
+                logger.info(f"Stock data for {symbol} saved to {file_path}")
+            except Exception as e:
+                logger.error(f"Failed to extract/save stock data for {symbol}: {e}")
 
-    def extract_daily_crypto(self, symbol: str, market: str) -> None:
+    def extract_daily_crypto(self, crypto_pairs: list[tuple[str, str]]) -> None:
         """
-        Extract daily cryptocurrency data for a given symbol and market, then save as a JSON file.
+        Extract daily cryptocurrency data for given symbol and market pairs, then save as JSON files.
 
         Args:
-            symbol (str): Cryptocurrency symbol to fetch (e.g., 'BTC').
-            market (str): Market in which the cryptocurrency is traded (e.g., 'USD').
+            pairs (list[tuple[str, str]]): List of tuples containing (symbol, market) pairs.
         """
-        try:
-            data = self.query_av.get_daily_crypto_data(symbol=symbol, market=market)
-            file_path = self.raw_data_dir / "cryptocurrencies" / f"{symbol}_{market}_crypto_data.json"
-            save_json(file_path, data)
-            logger.info(f"Cryptocurrency data for {symbol} in {market} saved to {file_path}")
-        except Exception as e:
-            logger.error(f"Failed to extract/save cryptocurrency data for {symbol} in {market}: {e}")
+        for symbol, market in crypto_pairs:
+            try:
+                data = self.query_av.get_daily_crypto_data(symbol=symbol, market=market)
+                file_path = self.raw_data_dir / "cryptocurrencies" / f"{symbol}_{market}_crypto_data.json"
+                save_json(file_path, data)
+                logger.info(f"Cryptocurrency data for {symbol} in {market} saved to {file_path}")
+            except Exception as e:
+                logger.error(f"Failed to extract/save cryptocurrency data for {symbol} in {market}: {e}")
 
-    def extract_forex(self, from_symbol: str, to_symbol: str, outputsize: str) -> None:
+    def extract_forex(self, forex_pairs: list[tuple[str, str]], outputsize: str) -> None:
         """
         Extract forex data for a given currency pair and save as a JSON file.
 
@@ -90,13 +91,14 @@ class Extract:
                 'compact' returns the latest 100 data points.
                 'full' returns the full-length time series of 20+ years of historical data.
         """
-        try:
-            data = self.query_av.get_forex_daily(from_symbol=from_symbol, to_symbol=to_symbol, outputsize=outputsize)
-            file_path = self.raw_data_dir / "forex" / f"{from_symbol}_{to_symbol}_forex_data.json"
-            save_json(file_path, data)
-            logger.info(f"Forex data for {from_symbol} to {to_symbol} saved to {file_path}")
-        except Exception as e:
-            logger.error(f"Failed to extract/save forex data for {from_symbol} to {to_symbol}: {e}")
+        for from_symbol, to_symbol in forex_pairs:
+            try:
+                data = self.query_av.get_forex_daily(from_symbol=from_symbol, to_symbol=to_symbol, outputsize=outputsize)
+                file_path = self.raw_data_dir / "forex" / f"{from_symbol}_{to_symbol}_forex_data.json"
+                save_json(file_path, data)
+                logger.info(f"Forex data for {from_symbol} to {to_symbol} saved to {file_path}")
+            except Exception as e:
+                logger.error(f"Failed to extract/save forex data for {from_symbol} to {to_symbol}: {e}")
 
     def extract_yahoo_financials(self, symbols: list[str]) -> None:
         """

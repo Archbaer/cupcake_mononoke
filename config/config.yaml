@@ -1,0 +1,46 @@
+extract_targets:
+  commodities:
+    - WTI
+    - BRENT
+    - COFFEE
+    - SUGAR
+    - COPPER
+    - NATURAL_GAS
+    - ALUMINUM
+
+  currency_pairs:
+    - [USD, EUR]
+    - [USD, JPY]
+    - [GBP, USD]
+    - [BRL, USD]
+    - [CNY, USD]
+    - [GBP, JPY]
+
+  stock_symbols:
+    - AAPL
+    - MSFT
+    - GOOGL
+    - AMZN
+    - TSLA
+    - NVDA
+    - META
+    - AMD
+    - IBM
+    
+  outputsize: full
+
+  crypto_pairs:
+    - [BTC, USD]
+    - [ETH, USD]
+    - [LTC, USD]
+    - [XRP, USD]
+    - [ADA, USD]
+    - [DOGE, USD]
+
+  forex_pairs:
+    - [BRL, USD]
+    - [EUR, USD]
+    - [GBP, USD]
+    - [JPY, USD]
+    - [CAD, USD]
+    - [CNY, USD]
