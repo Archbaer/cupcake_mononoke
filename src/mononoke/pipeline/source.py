@@ -9,12 +9,54 @@ class QueryAlphaVantage:
     Class to query Alpha Vantage API for market data.
     """
 
-    def __init__(self, api_key: str):
-        self.api_key = api_key
-        if not self.api_key:
-            logger.error("API key for Alpha Vantage is required.")
-            raise ValueError("API key for Alpha Vantage is required.")
+    def __init__(self, api_keys: list[str]):
+        self.api_keys = [key for key in api_keys if key]
+        self.current_key_index = 0 
+        if not self.api_keys:
+            logger.error("API keys for Alpha Vantage are required.")
+            raise ValueError("API keys for Alpha Vantage are required.")
+
         self.base_url = "https://www.alphavantage.co/query"
+
+    def _rotate_api_key(self):
+        """Switches to the next available API key."""
+
+        if self.current_key_index < len(self.api_keys) - 1:
+            self.current_key_index += 1
+            logger.warning(f"Switching to API key index {self.current_key_index} (total keys: {len(self.api_keys)})")
+        else:
+            logger.error(f"All {len(self.api_keys)} API keys have reached their rate limit for the day.")
+            raise Exception("All Alpha Vantage API keys have reached their rate limit.")
+        
+    def _make_request(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """Makes a request to the Alpha Vantage API, rotating keys if rate limited."""
+        while self.current_key_index < len(self.api_keys):
+            params["apikey"] = self.api_keys[self.current_key_index]
+            res = requests.get(self.base_url, params=params)
+            
+            if res.status_code != 200:
+                logger.error(f"HTTP error: {res.status_code} - {res.text}")
+                raise Exception(f"HTTP error: {res.status_code} - {res.text}")
+            
+            try:
+                data = res.json()
+            except ValueError:
+                logger.error("Alpha Vantage returned non-JSON response.")
+                raise Exception("Alpha Vantage returned non-JSON response.")
+            
+            # Checking for rate limit error
+            msg = data.get("Note") or data.get("Information") or data.get("Error Message")
+            if msg and "rate limit" in msg.lower():
+                logger.warning(f"Rate limit reached for key index {self.current_key_index}. Retrying with next key.")
+                self._rotate_api_key()
+                continue
+
+            if msg: 
+                logger.error(f"Alpha Vantage error: {msg}")
+                raise Exception(f"Alpha Vantage error: {msg}")
+            
+            return data
+
 
     def get_commodity_data(self, commodity: str, interval: Optional[str] = "monthly") -> Dict[str, Any]:
         """
@@ -30,26 +72,14 @@ class QueryAlphaVantage:
         """
         params = {
             "function": commodity,
-            "interval": interval,
-            "apikey": self.api_key
+            "interval": interval
         }
 
         res = requests.get(self.base_url, params=params)
         try:
-            data = res.json()
-        except ValueError:
-            logger.error("Alpha Vantage returned non-JSON response.")
-            raise Exception("Alpha Vantage returned non-JSON response.")
-
-        if res.status_code != 200:
-            logger.error(f"HTTP error fetching {commodity}: {res.status_code} - {res.text}")
-            raise Exception(f"HTTP error fetching {commodity}: {res.status_code} - {res.text}")
-
-        # Detect API-level errors even when HTTP 200
-        if any(k in data for k in ("Error Message", "Note", "Information")):
-            msg = data.get("Error Message") or data.get("Note") or data.get("Information")
-            logger.error(f"Alpha Vantage error for {commodity}: {msg}")
-            raise Exception(f"Alpha Vantage error for {commodity}: {msg}")
+            data = self._make_request(params)
+        except:
+            raise Exception(f"Failed to fetch {commodity} data.")
 
         logger.info(f"Data fetched successfully for {commodity}")
         return data
@@ -68,26 +98,14 @@ class QueryAlphaVantage:
         params = {
             "function": "CURRENCY_EXCHANGE_RATE",
             "from_currency": from_currency,
-            "to_currency": to_currency,
-            "apikey": self.api_key
+            "to_currency": to_currency
         }
 
-        res = requests.get(self.base_url, params=params)
         try:
-            data = res.json()
+            data = self._make_request(params)
         except ValueError:
-            logger.error("Alpha Vantage returned non-JSON response.")
-            raise Exception("Alpha Vantage returned non-JSON response.")
-
-        if res.status_code != 200:
-            logger.error(f"HTTP error fetching exchange rate {from_currency}->{to_currency}: {res.status_code} - {res.text}")
-            raise Exception(f"HTTP error fetching exchange rate {from_currency}->{to_currency}: {res.status_code} - {res.text}")
-
-        if any(k in data for k in ("Error Message", "Note", "Information")):
-            msg = data.get("Error Message") or data.get("Note") or data.get("Information")
-            logger.error(f"Alpha Vantage error for Exchange rate {from_currency}->{to_currency}: {msg}")
-            raise Exception(f"Alpha Vantage error for Exchange rate {from_currency}->{to_currency}: {msg}")
-
+            raise Exception(f"Failed to fetch exchange rate data for {from_currency} to {to_currency}.")
+        
         # Validate expected structure for this endpoint
         if "Realtime Currency Exchange Rate" not in data:
             logger.error(f"Unexpected response structure for {from_currency}->{to_currency}: {data}")
@@ -113,26 +131,14 @@ class QueryAlphaVantage:
         params = {
             "function": "TIME_SERIES_DAILY",
             "symbol": symbol,
-            "outputsize": outputsize,
-            "apikey": self.api_key
+            "outputsize": outputsize
         }
 
-        res = requests.get(self.base_url, params=params)
 
         try:
-            data = res.json()
-        except ValueError:
-            logger.error("Alpha Vantage returned non-JSON response.")
-            raise Exception("Alpha Vantage returned non-JSON response.")
-        
-        if res.status_code != 200:
-            logger.error(f"HTTP error fetching stock data for {symbol}: {res.status_code} - {res.text}")
-            raise Exception(f"HTTP error fetching stock data for {symbol}: {res.status_code} - {res.text}")
-        
-        if any(k in data for k in ("Error Message", "Note", "Information")):
-            msg = data.get("Error Message") or data.get("Note") or data.get("Information")
-            logger.error(f"Alpha Vantage error for stock {symbol}: {msg}")
-            raise Exception(f"Alpha Vantage error for stock {symbol}: {msg}")
+            data = self._make_request(params)
+        except:
+            raise Exception(f"Failed to fetch stock data for {symbol}.")
         
         logger.info(f"Data fetched successfully for stock {symbol}")
         return data
@@ -152,26 +158,17 @@ class QueryAlphaVantage:
         params = {
             "function": "DIGITAL_CURRENCY_DAILY",
             "symbol": symbol,
-            "market": market,
-            "apikey": self.api_key  
+            "market": market
         }
 
-        res = requests.get(self.base_url, params=params)
-
         try:
-            data = res.json()
-        except ValueError:
-            logger.error("Alpha Vantage returned non-JSON response.")
-            raise Exception("Alpha Vantage returned non-JSON response.")
-        
-        if res.status_code != 200:
-            logger.error(f"HTTP error fetching crypto data for {symbol}: {res.status_code} - {res.text}")
-            raise Exception(f"HTTP error fetching crypto data for {symbol}: {res.status_code} - {res.text}")
+            data = self._make_request(params)
+        except:
+            raise Exception(f"Failed to fetch crypto data for {symbol}.")
 
-        if any(k in data for k in ("Error Message", "Note", "Information")):
-            msg = data.get("Error Message") or data.get("Note") or data.get("Information")
-            logger.error(f"Alpha Vantage error for crypto {symbol}: {msg}")
-            raise Exception(f"Alpha Vantage error for crypto {symbol}: {msg}")
+        if data.get("Error Message"):
+            logger.error(f"Alpha Vantage error fetching crypto data for {symbol}: {data['Error Message']}")
+            raise Exception(f"Alpha Vantage error fetching crypto data for {symbol}: {data['Error Message']}")
 
         logger.info(f"Data fetched successfully for crypto {symbol}")
         return data
@@ -195,26 +192,17 @@ class QueryAlphaVantage:
             "function": "FX_DAILY",
             "from_symbol": from_symbol,
             "to_symbol": to_symbol,
-            "outputsize": outputsize,
-            "apikey": self.api_key
+            "outputsize": outputsize
         }
 
-        res = requests.get(self.base_url, params=params)
-
         try:
-            data = res.json()
-        except ValueError:
-            logger.error("Alpha Vantage returned non-JSON response.")
-            raise Exception("Alpha Vantage returned non-JSON response.")
-        
-        if res.status_code != 200:
-            logger.error(f"HTTP error fetching Forex data for {from_symbol}->{to_symbol}: {res.status_code} - {res.text}")
-            raise Exception(f"HTTP error fetching Forex data for {from_symbol}->{to_symbol}: {res.status_code} - {res.text}")
+            data = self._make_request(params)
+        except:
+            raise Exception(f"Failed to fetch Forex data for {from_symbol}->{to_symbol}.")
 
-        if any(k in data for k in ("Error Message", "Note", "Information")):
-            msg = data.get("Error Message") or data.get("Note") or data.get("Information")
-            logger.error(f"Alpha Vantage error for Forex {from_symbol}->{to_symbol}: {msg}")
-            raise Exception(f"Alpha Vantage error for Forex {from_symbol}->{to_symbol}: {msg}")
+        if data.get("Error Message"):
+            logger.error(f"Alpha Vantage error fetching Forex data for {from_symbol}->{to_symbol}: {data['Error Message']}")
+            raise Exception(f"Alpha Vantage error fetching Forex data for {from_symbol}->{to_symbol}: {data['Error Message']}")
 
         logger.info(f"Data fetched successfully for Forex {from_symbol} to {to_symbol}")
         return data

@@ -8,11 +8,10 @@ class Extract:
     Class to handle data extraction and save it locally.
     """
 
-    def __init__(self, api_key: str, raw_data_dir: Path = Path("artifacts/raw")):
-        self.api_key = api_key
+    def __init__(self, api_keys: list[str], raw_data_dir: Path = Path("artifacts/raw")):
         self.raw_data_dir = raw_data_dir
         create_directories([self.raw_data_dir])
-        self.query_av = QueryAlphaVantage(api_key=self.api_key)
+        self.query_av = QueryAlphaVantage(api_keys=api_keys)
 
     def commodities_extract(self, commodities: list[str]) -> None:
         """

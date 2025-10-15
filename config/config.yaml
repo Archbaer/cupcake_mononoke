@@ -13,15 +13,12 @@ extract_targets:
     - [USD, JPY]
     - [GBP, USD]
     - [BRL, USD]
-    - [CNY, USD]
     - [GBP, JPY]
 
   stock_symbols:
     - AAPL
-    - MSFT
     - GOOGL
     - AMZN
-    - TSLA
     - NVDA
     - META
     - AMD
