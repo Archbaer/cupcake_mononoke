@@ -1,4 +1,5 @@
 import requests
+import time
 from typing import Optional, Dict, Any
 from src.mononoke import logger
 from datetime import datetime
@@ -15,6 +16,7 @@ class QueryAlphaVantage:
         if not self.api_keys:
             logger.error("API keys for Alpha Vantage are required.")
             raise ValueError("API keys for Alpha Vantage are required.")
+        logger.info(f"Initialized QueryAlphaVantage with {len(self.api_keys)} API keys.")
 
         self.base_url = "https://www.alphavantage.co/query"
 
@@ -30,8 +32,11 @@ class QueryAlphaVantage:
         
     def _make_request(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Makes a request to the Alpha Vantage API, rotating keys if rate limited."""
+
         while self.current_key_index < len(self.api_keys):
             params["apikey"] = self.api_keys[self.current_key_index]
+
+            logger.debug(f"Making request with API key index {self.current_key_index}: {params}")
             res = requests.get(self.base_url, params=params)
             
             if res.status_code != 200:
@@ -46,14 +51,20 @@ class QueryAlphaVantage:
             
             # Checking for rate limit error
             msg = data.get("Note") or data.get("Information") or data.get("Error Message")
-            if msg and "rate limit" in msg.lower():
-                logger.warning(f"Rate limit reached for key index {self.current_key_index}. Retrying with next key.")
-                self._rotate_api_key()
-                continue
 
-            if msg: 
-                logger.error(f"Alpha Vantage error: {msg}")
-                raise Exception(f"Alpha Vantage error: {msg}")
+            if msg:
+                if "rate limit" in msg.lower() or "frequency" in msg.lower():
+                    logger.warning(f"API key index {self.current_key_index} rate limited: {msg}")
+                    
+                    try:
+                        self._rotate_api_key()
+                        time.sleep(300) # brief pause before retrying
+                        continue
+                    except Exception as e:
+                        raise e
+                else:
+                    logger.error(f"Alpha Vantage error: {msg}")
+                    raise ValueError(f"Alpha Vantage error: {msg}")
             
             return data
 
@@ -74,13 +85,7 @@ class QueryAlphaVantage:
             "function": commodity,
             "interval": interval
         }
-
-        res = requests.get(self.base_url, params=params)
-        try:
-            data = self._make_request(params)
-        except:
-            raise Exception(f"Failed to fetch {commodity} data.")
-
+        data = self._make_request(params)
         logger.info(f"Data fetched successfully for {commodity}")
         return data
     
@@ -101,10 +106,7 @@ class QueryAlphaVantage:
             "to_currency": to_currency
         }
 
-        try:
-            data = self._make_request(params)
-        except ValueError:
-            raise Exception(f"Failed to fetch exchange rate data for {from_currency} to {to_currency}.")
+        data = self._make_request(params)
         
         # Validate expected structure for this endpoint
         if "Realtime Currency Exchange Rate" not in data:
@@ -112,6 +114,7 @@ class QueryAlphaVantage:
             raise Exception(f"Unexpected response structure for {from_currency}->{to_currency}")
 
         logger.info(f"Data fetched successfully for {from_currency} to {to_currency}")
+
         return data
 
     def get_daily_stock_data(self, symbol: str, outputsize: str) -> Dict[str, Any]:
@@ -135,10 +138,7 @@ class QueryAlphaVantage:
         }
 
 
-        try:
-            data = self._make_request(params)
-        except:
-            raise Exception(f"Failed to fetch stock data for {symbol}.")
+        data = self._make_request(params)
         
         logger.info(f"Data fetched successfully for stock {symbol}")
         return data
