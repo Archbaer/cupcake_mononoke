@@ -262,3 +262,64 @@ class Transform:
         # Saving the DataFrames to csv files
         self._upsert_csv(df_meta, insta_dir, subset=["instrument_id"])
         self._upsert_csv(df_ts, ts_path, subset=["instrument_id", "date"])
+
+    def transform_forex(self, raw_data: dict[str, str]) -> None:
+        """
+        Transform raw forex data into structured DataFrames and save as CSV files.
+
+        Args:
+            raw_data: Raw data dictionary from Alpha Vantage API.
+        """
+        metadata = raw_data.get('Meta Data', {})
+        time_series = raw_data.get('Time Series FX (Daily)', {})
+
+        source = "Alpha Vantage"
+        symbol = metadata.get("2. From Symbol") + "_" + metadata.get("3. To Symbol")
+        last_updated = metadata.get("5. Last Refreshed")
+
+        hashing = self.generate_hash_id(source, "forex", symbol)
+
+        meta = {
+            "instrumend_id": hashing,
+            "source": source,
+            "data_type": "forex",
+            "symbol": symbol,
+            "last_updated": last_updated
+        }
+
+        ts = []
+        for k, v in time_series.items():
+            ts.append({
+                "instrument_id": hashing,
+                "date": k,
+                "open": self._to_float(v.get("1. open")),
+                "high": self._to_float(v.get("2. high")),
+                "low": self._to_float(v.get("3. low")),
+                "close": self._to_float(v.get("4. close"))
+            })
+
+        df_meta = pd.DataFrame([meta])
+        df_ts = pd.DataFrame(ts)
+
+        if not df_ts.empty:
+            df_ts['date'] = pd.to_datetime(df_ts['date']).dt.strftime('%Y-%m-%d')
+            df_ts = df_ts.dropna(subset=['instrument_id', 'date', 'open', 'high', 'low', 'close'])
+
+        output_dir = self.processed_data_dir / "forex"
+        insta_dir = output_dir / "instruments.csv"
+        ts_path = output_dir / "timeseries.csv"
+
+        self._upsert_csv(df_meta, insta_dir, subset=["instrument_id"])
+        self._upsert_csv(df_ts, ts_path, subset=["instrument_id", "date"])
+        logger.info(f"Transformed forex data saved for {symbol} in {output_dir}")
+
+    def transform_yahoo_financials(self, raw_data: dict[str, str]) -> None:
+        """
+        Transform raw Yahoo Financials data into structured DataFrames and save as CSV files.
+
+        Args:
+            raw_data: Raw data dictionary from Yahoo Financials.
+        """
+        # Will go here
+        pass
+
