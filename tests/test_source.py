@@ -3,7 +3,10 @@ import pytest
 import yfinance as yf
 from src.mononoke.pipeline.source import QueryYahooFinance, QueryAlphaVantage
 
-api_key = os.getenv("ALPHA_VANTAGE")
+api_keys = [
+    os.getenv("ALPHA_VANTAGE"),
+    os.getenv("ALPHA_VANTAGE2"),
+]
 
 def test_query_yahoo_finance():
     yahoo = QueryYahooFinance()
@@ -13,13 +16,13 @@ def test_query_yahoo_finance():
 
 @pytest.fixture
 def alpha_api_key():
-    if not api_key:
-        pytest.skip("ALPHA_VANTAGE API key not set in environment variables.")
-    return api_key
+    if not api_keys:
+        pytest.skip("ALPHA_VANTAGE API keys not set in environment variables.")
+    return api_keys
 
 
 def test_query_alpha_vantage(alpha_api_key):
-    alpha = QueryAlphaVantage(api_key=alpha_api_key)
+    alpha = QueryAlphaVantage(api_keys=alpha_api_key)
 
     forex = alpha.get_forex_daily(from_symbol='USD', to_symbol='JPY', outputsize='compact')
     assert forex['Meta Data']['2. From Symbol'] == 'USD'
