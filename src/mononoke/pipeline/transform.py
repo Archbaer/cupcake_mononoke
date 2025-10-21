@@ -68,6 +68,31 @@ class Transform:
             df = df.drop_duplicates(subset=subset, keep="last")  # Remove duplicates
 
         df.to_csv(path, index=False)  # Save combined data
+
+    def info_type(self, file: list[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+        """
+        Extract information key-value pairs and company officers from the file. It can only be used to process
+        information type files.
+        
+        Args:
+            file: A dictionary containing company information.
+
+        Returns:
+            A tuple containing:
+            - information_table: A dictionary with company information.
+            - company_officers_table: A dictionary with company officers information.
+        """
+
+
+        information_table = {}
+        company_officers_table = {}
+        for k, v in file.items():
+            if k == "companyOfficers":
+                company_officers_table = v
+            elif k not in ["sector_top_companies", "companyOfficers"]:
+                information_table[k] = v
+
+        return information_table, company_officers_table
     
     def _to_float(self, value: Any) -> float | None:
         try:
@@ -321,5 +346,33 @@ class Transform:
             raw_data: Raw data dictionary from Yahoo Financials.
         """
         # Will go here
-        pass
+        info_rows = []
+        for i, file in enumerate(data['yahoo_financials']):    
+            key = next(iter(file))
+            if key == 'address1':
+                print(f"[{i}] Info type file")
+                info_table, officers_table = self.info_type(file)
+                info_rows.append(info_table)
+            elif key == 'industry':
+                print(f"[{i}] Industry type file")
+            else:
+                print(f"[{i}] Financials type file")
 
+        hashing = self.generate_hash_id("Yahoo Financials", 
+                                        "information", 
+                                        info_table.get("symbol", ""), 
+                                        info_table.get("address1", ""))
+
+        for info in info_rows:
+            temp_dict = {"hash_id": hashing}
+            temp_dict.update(info)
+            info = temp_dict
+
+        info_df = pd.DataFrame(info_rows)
+
+        output_dir = self.processed_data_dir / "yahoo_financials"
+        info_path = output_dir / "information.csv"
+        officers_path = output_dir / "company_officers.csv"
+
+        self._upsert_csv(info_df, info_path, subset=["symbol"])
+        self._upsert_csv(officers_df, officers_path, subset=["symbol"])
