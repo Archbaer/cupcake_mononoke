@@ -113,7 +113,7 @@ extract_targets:
 
 1. Clone the repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/Archbaer/cupcake_mononoke
 cd cupcake_mononoke
 ```
 
