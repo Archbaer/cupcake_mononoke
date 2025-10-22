@@ -236,29 +236,3 @@ class QueryYahooFinance:
         except Exception as e:
             logger.error(f"Error fetching financial summary for {symbol} from Yahoo Finance: {e}")
             raise Exception(f"Error fetching financial summary for {symbol} from Yahoo Finance: {e}")
-
-    def get_industry_data(self, symbol: str) -> Dict[str, Any]:
-        """
-        Fetch industry data from Yahoo Finance.
-
-        Args:
-            symbol (str): The stock symbol to fetch (e.g., 'AAPL', 'MSFT').
-        """
-        data = {}
-        try:
-            ticker = yf.Ticker(symbol)
-            industry = yf.Industry(ticker.info.get('industryKey'))
-
-            data['industry'] = industry.sector_key
-            data['name'] = industry.name
-            data['top_companies'] = industry.top_companies.to_dict() if industry.top_companies is not None else {}
-            data['top_growth_companies'] = industry.top_growth_companies.to_dict() if industry.top_growth_companies is not None else {}
-            data['overview'] = industry.overview
-            data['research_reports'] = industry.research_reports
-
-
-            logger.info(f"Industry data fetched successfully for provided {symbol} from Yahoo Finance")
-            return data
-        except Exception as e:
-            logger.error(f"Error fetching industry data for {symbol} from Yahoo Finance: {e}")
-            raise Exception(f"Error fetching industry data for {symbol} from Yahoo Finance: {e}")

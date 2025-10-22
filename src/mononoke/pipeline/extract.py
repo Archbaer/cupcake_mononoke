@@ -110,19 +110,19 @@ class Extract:
         for symbol in symbols:
             try:
                 financials, info = yahoo.get_financial_summary(symbol=symbol)
-                industry_info = yahoo.get_industry_data(symbol=symbol)
 
                 financials_path = self.raw_data_dir / "yahoo_financials" / f"{symbol}_financials.json"
                 info_path = self.raw_data_dir / "yahoo_financials" / f"{symbol}_info.json"
-                industry_info_path = self.raw_data_dir / "yahoo_financials" / f"{symbol}_industry_info.json"
 
                 financials = {str(k): v for k, v in financials.items()}
-                info = {str(k): v for k, v in info.items()} 
-                                
+                info = {str(k): v for k, v in info.items()}
+
+                symbol = info.get('symbol', symbol)
+                financials = {"symbol": symbol, **financials}
+
                 save_json(financials_path, financials)
                 save_json(info_path, info)
-                save_json(industry_info_path, industry_info)
 
-                logger.info(f"Yahoo Finance data for {symbol} saved to {financials_path}, {info_path}, and {industry_info_path}")
+                logger.info(f"Yahoo Finance data for {symbol} saved to {financials_path}, {info_path}")
             except Exception as e:
                 logger.error(f"Failed to extract/save Yahoo Finance data for {symbol}: {e}")

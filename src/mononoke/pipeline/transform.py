@@ -93,7 +93,16 @@ class Transform:
                 information_table[k] = v
 
         return information_table, company_officers_table
-    
+
+    def financial_type(self, file: list[str, Any]) -> dict[str, Any]:
+        full_financial = []
+        for k, v in file.items():
+            full_financial.append({
+                "date": k,
+                **v
+            })
+        return full_financial
+
     def _to_float(self, value: Any) -> float | None:
         try:
             return float(value) if value is not None else None
@@ -345,34 +354,52 @@ class Transform:
         Args:
             raw_data: Raw data dictionary from Yahoo Financials.
         """
-        # Will go here
         info_rows = []
-        for i, file in enumerate(data['yahoo_financials']):    
+        officers_rows = []
+        financials_rows = []
+
+        for i, file in enumerate(raw_data):    
             key = next(iter(file))
+            
             if key == 'address1':
-                print(f"[{i}] Info type file")
-                info_table, officers_table = self.info_type(file)
-                info_rows.append(info_table)
-            elif key == 'industry':
-                print(f"[{i}] Industry type file")
+                logger.info(f"[{i}] Processing Info type file")
+                info_table, officers = self.info_type(file)
+                
+                hashing = self.generate_hash_id(
+                    "Yahoo Financials", 
+                    "information", 
+                    info_table.get("symbol", "")
+                )
+                
+                info_with_hash = {'instrument_id': hashing, **info_table}
+                info_rows.append(info_with_hash)
+                
+                if officers:
+                    for officer in officers:
+                        officer['instrument_id'] = hashing
+                        officer['symbol'] = info_table.get('symbol', '')
+                    officers_rows.extend(officers)            
             else:
-                print(f"[{i}] Financials type file")
+                logger.info(f"[{i}] Processing Financials type file")
+                finance_table = self.financial_type(file)
+                if finance_table:
+                    # Hashing and linking each financial record to info though instrument_id to be implemented
+                    
 
-        hashing = self.generate_hash_id("Yahoo Financials", 
-                                        "information", 
-                                        info_table.get("symbol", ""), 
-                                        info_table.get("address1", ""))
+                    financials_rows.extend(finance_table)
 
-        for info in info_rows:
-            temp_dict = {"hash_id": hashing}
-            temp_dict.update(info)
-            info = temp_dict
+        if info_rows:
+            info_df = pd.DataFrame(info_rows)
+            output_dir = self.processed_data_dir / "yahoo_financials"
+            info_path = output_dir / "information.csv"
+            self._upsert_csv(info_df, info_path, subset=["instrument_id"])
+            logger.info(f"Saved {len(info_df)} company info records")
+        
+        if officers_rows:
+            officers_df = pd.DataFrame(officers_rows)
+            officers_path = output_dir / "company_officers.csv"
+            self._upsert_csv(officers_df, officers_path, subset=["instrument_id", "name"])
+            logger.info(f"Saved {len(officers_df)} officer records")
 
-        info_df = pd.DataFrame(info_rows)
 
-        output_dir = self.processed_data_dir / "yahoo_financials"
-        info_path = output_dir / "information.csv"
-        officers_path = output_dir / "company_officers.csv"
-
-        self._upsert_csv(info_df, info_path, subset=["symbol"])
-        self._upsert_csv(officers_df, officers_path, subset=["symbol"])
+        logger.info(f"Summary: {len(info_rows)} info, {len(financials_rows)} financials processed.")
