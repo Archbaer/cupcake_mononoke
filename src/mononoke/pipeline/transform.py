@@ -83,7 +83,6 @@ class Transform:
             - company_officers_table: A dictionary with company officers information.
         """
 
-
         information_table = {}
         company_officers_table = {}
         for k, v in file.items():
@@ -95,13 +94,15 @@ class Transform:
         return information_table, company_officers_table
 
     def financial_type(self, file: list[str, Any]) -> dict[str, Any]:
-        full_financial = []
+        symbol = file.get('symbol') or ""
+        partial_financial = []
         for k, v in file.items():
-            full_financial.append({
+            if k != 'symbol':
+                partial_financial.append({
                 "date": k,
                 **v
-            })
-        return full_financial
+                })
+        return partial_financial, symbol
 
     def _to_float(self, value: Any) -> float | None:
         try:
@@ -358,16 +359,22 @@ class Transform:
         officers_rows = []
         financials_rows = []
 
+        """
+        TO BE IMPLEMENTED
+
+        FINANCIALS DATA BEING DUPLICATED, AND THERE IS TOO MANY MISSING VALUES IN CERTAIN RECORDS
+        NEED TO FIGURE OUT A WAY TO CLEAN THE DATA BEFORE UPLOADING TO CSV WITHOUT LOSING TOO MUCH INFORMATION
+        """
+
         for i, file in enumerate(raw_data):    
             key = next(iter(file))
             
             if key == 'address1':
                 logger.info(f"[{i}] Processing Info type file")
                 info_table, officers = self.info_type(file)
-                
                 hashing = self.generate_hash_id(
                     "Yahoo Financials", 
-                    "information", 
+                    "financials", 
                     info_table.get("symbol", "")
                 )
                 
@@ -381,25 +388,48 @@ class Transform:
                     officers_rows.extend(officers)            
             else:
                 logger.info(f"[{i}] Processing Financials type file")
-                finance_table = self.financial_type(file)
+                finance_table, symbol = self.financial_type(file)
+                print(f"Current finance_table length: {len(finance_table)}")
+                hashing = self.generate_hash_id("Yahoo Financials", "financials", symbol)
                 if finance_table:
                     # Hashing and linking each financial record to info though instrument_id to be implemented
-                    
+                    for timestamp in finance_table:
+                        rows = [{
+                            "instrument_id": hashing,
+                            **timestamp
+                        }]
+                        print(f"Current rows length: {len(rows)}")
 
-                    financials_rows.extend(finance_table)
+                    financials_rows.extend(rows)
+
+        output_dir = self.processed_data_dir / "yahoo_financials"
 
         if info_rows:
             info_df = pd.DataFrame(info_rows)
-            output_dir = self.processed_data_dir / "yahoo_financials"
             info_path = output_dir / "information.csv"
+
             self._upsert_csv(info_df, info_path, subset=["instrument_id"])
             logger.info(f"Saved {len(info_df)} company info records")
         
         if officers_rows:
             officers_df = pd.DataFrame(officers_rows)
             officers_path = output_dir / "company_officers.csv"
+
             self._upsert_csv(officers_df, officers_path, subset=["instrument_id", "name"])
             logger.info(f"Saved {len(officers_df)} officer records")
 
+        if financials_rows:
+            financials_df = pd.DataFrame(financials_rows)
+            initial_len = len(financials_df)
+
+            financials_df['date'] = pd.to_datetime(financials_df['date']).dt.strftime('%Y-%m-%d')
+            financials_df = financials_df.dropna(thresh=len(financials_df.columns) * 0.5).reset_index(drop=True)
+            financials_df.fillna(value=financials_df.mean(numeric_only=True), inplace=True)
+
+            logger.warning(f"Removed {initial_len - len(financials_df)} financial records due to excessive missing values")
+            
+            financials_path = output_dir / "financials.csv"
+            self._upsert_csv(financials_df, financials_path, subset=["instrument_id", "date"])
+            logger.info(f"Saved {len(financials_df)} financial records")
 
         logger.info(f"Summary: {len(info_rows)} info, {len(financials_rows)} financials processed.")
