@@ -393,14 +393,11 @@ class Transform:
                 hashing = self.generate_hash_id("Yahoo Financials", "financials", symbol)
                 if finance_table:
                     # Hashing and linking each financial record to info though instrument_id to be implemented
-                    for timestamp in finance_table:
-                        rows = [{
-                            "instrument_id": hashing,
-                            **timestamp
-                        }]
-                        print(f"Current rows length: {len(rows)}")
-
+                    rows = [{"instrument_id": hashing, "symbol": symbol, **record} for record in finance_table]
                     financials_rows.extend(rows)
+                    print(f"Current rows length: {len(rows)}")
+
+                        
 
         output_dir = self.processed_data_dir / "yahoo_financials"
 
@@ -420,10 +417,10 @@ class Transform:
 
         if financials_rows:
             financials_df = pd.DataFrame(financials_rows)
-            initial_len = len(financials_df)
-
             financials_df['date'] = pd.to_datetime(financials_df['date']).dt.strftime('%Y-%m-%d')
-            financials_df = financials_df.dropna(thresh=len(financials_df.columns) * 0.5).reset_index(drop=True)
+
+            initial_len = len(financials_df)
+            financials_df = financials_df.dropna(thresh=len(financials_df.columns) * 0.3).reset_index(drop=True)
             financials_df.fillna(value=financials_df.mean(numeric_only=True), inplace=True)
 
             logger.warning(f"Removed {initial_len - len(financials_df)} financial records due to excessive missing values")
