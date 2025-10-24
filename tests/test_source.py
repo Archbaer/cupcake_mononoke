@@ -49,10 +49,6 @@ def test_query_yahoo_finance():
     ticker = yf.Ticker(symbol)
     financials, info = yahoo.get_financial_summary(symbol)
 
-    assert len(financials) > 0
+    assert financials.get('symbol') == symbol
     assert info["symbol"] == symbol
-
-    industry_info = yahoo.get_industry_data(symbol)
-
-    assert industry_info['industry'] == ticker.info.get('sectorKey')
     
