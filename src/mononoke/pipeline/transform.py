@@ -420,7 +420,7 @@ class Transform:
             financials_df['date'] = pd.to_datetime(financials_df['date']).dt.strftime('%Y-%m-%d')
 
             initial_len = len(financials_df)
-            financials_df = financials_df.dropna(thresh=len(financials_df.columns) * 0.3).reset_index(drop=True)
+            financials_df = financials_df.dropna(thresh=len(financials_df.columns) * 0.4).reset_index(drop=True)
             financials_df.fillna(value=financials_df.mean(numeric_only=True), inplace=True)
 
             logger.warning(f"Removed {initial_len - len(financials_df)} financial records due to excessive missing values")
