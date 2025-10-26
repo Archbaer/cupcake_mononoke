@@ -41,3 +41,8 @@ extract_targets:
     - [JPY, USD]
     - [CAD, USD]
     - [CNY, USD]
+
+data_directory: 
+  raw_data: ./data/raw/
+  processed_data: ./data/processed/
+
