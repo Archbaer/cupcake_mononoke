@@ -13,3 +13,4 @@ pyYAML
 joblib
 yfinance
 pydantic
+psycopg2
