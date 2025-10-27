@@ -9,6 +9,8 @@ class Extract:
     """
 
     def __init__(self, api_keys: list[str], raw_data_dir: Path = Path("artifacts/raw")):
+        if type(raw_data_dir) is str:
+            raw_data_dir = Path(raw_data_dir)
         self.raw_data_dir = raw_data_dir
         create_directories([self.raw_data_dir])
         self.query_av = QueryAlphaVantage(api_keys=api_keys)

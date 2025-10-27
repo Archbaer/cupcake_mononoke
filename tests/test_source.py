@@ -49,6 +49,6 @@ def test_query_yahoo_finance():
     ticker = yf.Ticker(symbol)
     financials, info = yahoo.get_financial_summary(symbol)
 
-    assert len(financials) > 0 
+    assert len(financials) > 0  
     assert info["symbol"] == symbol
     
