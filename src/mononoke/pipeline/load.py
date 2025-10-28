@@ -1,7 +1,8 @@
 from src.mononoke.utils.common import load_json, read_yaml
 from src.mononoke import logger
 from dotenv import load_dotenv
-import psycopg2
+from sqlalchemy import create_engine, text
+import pandas as pd
 import os
 
 from pathlib import Path
@@ -30,13 +31,8 @@ class Load:
         db_port = os.getenv("DB_PORT")
         logger.info(f"Connecting to database {db_name} at {db_host}:{db_port} as user {db_user}")
 
-        self.connection = psycopg2.connect(
-            dbname=db_name,
-            user=db_user,
-            password=db_password,
-            host=db_host,
-            port=db_port
+        self.engine = create_engine(
+            f"postgresql+psycopg2://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
         )
-        self.cursor = self.connection.cursor()
 
-        
+       

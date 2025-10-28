@@ -13,4 +13,5 @@ pyYAML
 joblib
 yfinance
 pydantic
-psycopg2
+psycopg2-binary
+sqlalchemy
