@@ -18,7 +18,10 @@ list_of_files = [
     f'src/{project_name}/pipeline/load.py',
     f'src/{project_name}/notebooks/research.ipynb',
     'api/',
+    'configs/config.yaml',
     'params.yaml',
+    'requirements.txt',
+    'docker-compose.yaml',
     'Dockerfile',
     "main.py"
 ]

@@ -50,6 +50,8 @@ class Load:
                 logger.info(f"Creating schema {schema} if not exists")
                 conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
 
+    def load_data(self):
+        pass  # To be implemented: Load data from processed files into the database tables
     
 
        
