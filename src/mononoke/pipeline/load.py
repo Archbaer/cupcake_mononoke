@@ -33,7 +33,7 @@ class Load:
         logger.info(f"Connecting to database {db_name} at {db_host}:{db_port} as user {db_user}")
 
         self.engine = create_engine(
-            f"postgresql+psycopg2://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}",
+            f"postgresql+psycopg2://{db_user}:{db_password}@localhost:{db_port}/{db_name}",
             pool_size=10,
             max_overflow=20,
             pool_pre_ping=True
@@ -60,17 +60,56 @@ class Load:
         """
         if not self.data_dir.exists():
             logger.warning(f"Data directory {self.data_dir} does not exist.")
-            return {}
+            return []
 
         data_paths = []
         for folder in os.listdir(self.data_dir):
             for file in os.listdir(self.data_dir/folder):
-                data_paths.append(self.data_dir/folder/file)
-        
+                data_paths.append(Path(os.path.join(self.data_dir/folder, file)))
         return data_paths
 
-    def load_data(self):
-        pass  # To be implemented: Load data from processed files into the database tables
-    
+    def load_data(self, csv_path: Path, table_name: str, schema: str = "public") -> None:
+        """
+        Load data from a CSV file into the specified database table.
+        
+        Args:
+            csv_path (Path): Path to the CSV file.
+            table_name (str): Name of the target database table.
+            schema (str): Database schema to use. Defaults to "public".
+        
+        """
 
-       
+        full_table = f"{schema}.{table_name}"
+
+        logger.info("Infering schema...")
+        df_sample = pd.read_csv(csv_path, nrows=1)
+
+        df_sample.head().to_sql(
+            name=table_name,
+            con=self.engine,
+            schema=schema,
+            if_exists="replace",
+            index=False
+        )
+        logger.info(f"Table {full_table} created.")
+
+        raw_conn = self.engine.raw_connection()
+        try:
+            with raw_conn.cursor() as cursor, open(csv_path, 'r') as f:
+                logger.info(f"Loading data from {csv_path} into {full_table}...")
+                cursor.copy_expert(
+                    sql=f"COPY {full_table} FROM STDIN WITH (FORMAT CSV, HEADER TRUE)",
+                    file=f
+                )
+            raw_conn.commit()
+
+            with self.engine.begin() as conn:
+                result = conn.execute(text(f"SELECT COUNT(*) FROM {full_table}"))
+                row_count = result.scalar()
+                logger.info(f"Loaded {row_count} rows into {full_table}.")
+        except Exception as e:
+            raw_conn.rollback()
+            logger.error(f"Error loading data into {full_table}: {e}")
+            raise
+        finally:
+            raw_conn.close()
