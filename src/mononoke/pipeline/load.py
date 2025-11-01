@@ -19,6 +19,7 @@ class Load:
         self.config = read_yaml(config_path)
         self.data_dir = Path(self.config['data_directory']['processed_data'])
         self._initialize_database()
+        self.file_paths = self._find_directory_files() or []
 
     def _initialize_database(self):
         """
@@ -49,6 +50,24 @@ class Load:
             for schema in schemas:
                 logger.info(f"Creating schema {schema} if not exists")
                 conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema}"))
+
+    def _find_directory_files(self) -> Dict[str, List[Path]]:
+        """
+        Scan the processed data directory and map subdirectories to their files.
+
+        Returns:
+            Dict[str, List[Path]]: A dictionary mapping subdirectory names to lists of file paths.
+        """
+        if not self.data_dir.exists():
+            logger.warning(f"Data directory {self.data_dir} does not exist.")
+            return {}
+
+        data_paths = []
+        for folder in os.listdir(self.data_dir):
+            for file in os.listdir(self.data_dir/folder):
+                data_paths.append(self.data_dir/folder/file)
+        
+        return data_paths
 
     def load_data(self):
         pass  # To be implemented: Load data from processed files into the database tables

@@ -43,8 +43,8 @@ extract_targets:
     - [CNY, USD]
 
 data_directory: 
-  raw_data: ./data/raw/
-  processed_data: ./data/processed/
+  raw_data: ./artifacts/raw/
+  processed_data: ./artifacts/processed/
 
 database_schemas:
   - finance
