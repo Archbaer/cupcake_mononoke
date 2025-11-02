@@ -73,8 +73,13 @@ The pipeline automatically handles API rate limits by rotating between multiple 
 - Implements upsert logic to prevent duplicates
 - Handles data type conversions and missing values
 
-#### 3. Load
-- TO BE IMPLEMENTED
+#### 3. Load ([`src/mononoke/pipeline/load.py`](src/mononoke/pipeline/load.py))
+- Loads processed data from CSV files into a structured database.
+- Initializes a connection to a PostgreSQL database using credentials from environment variables.
+- Creates necessary schemas in the database if they do not exist.
+- Scans the processed data directory for CSV files and maps them to their respective tables.
+- Appends data to existing tables or creates new tables based on the CSV schema.
+- Utilizes SQLAlchemy for database interactions and logging for tracking the loading process.
 
 ### Configuration
 
@@ -100,6 +105,7 @@ extract_targets:
     - [GBP, USD]
   
   outputsize: full  # 'compact' or 'full'
+  ...
 ```
 
 ## Setup
@@ -147,7 +153,7 @@ The pipeline will:
 pytest tests/
 ```
 
-## Data Schema
+# Data Schema 
 
 ### Instruments Table
 Each asset class has an `instruments.csv` with metadata:
@@ -173,7 +179,6 @@ GitHub Actions workflow ([`.github/workflows/cicd.yml`](.github/workflows/cicd.y
 
 ## Future Enhancements
 
-- [ ] Database integration (PostgreSQL/SQLite)
 - [ ] Machine learning model training
 - [ ] REST API for data access
 - [ ] Data visualization dashboard
