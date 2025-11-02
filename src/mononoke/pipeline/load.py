@@ -1,7 +1,7 @@
 from src.mononoke.utils.common import load_json, read_yaml
 from src.mononoke import logger
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, inspect
 import pandas as pd
 import os
 
@@ -78,38 +78,53 @@ class Load:
             schema (str): Database schema to use. Defaults to "public".
         
         """
+        if not schema:
+            logger.info("No schema specified, defaulting to 'public'")
+            schema = "public"
 
         full_table = f"{schema}.{table_name}"
+        inspector = inspect(self.engine)
 
-        logger.info("Infering schema...")
-        df_sample = pd.read_csv(csv_path, nrows=1)
+        if not inspector.has_table(table_name, schema=schema):
+            logger.info(f"Table {full_table} does not exist. Creating new table.")
+            df_schema = pd.read_csv(csv_path, nrows=1)
+            df_schema.head(1).to_sql(
+                name=table_name,
+                con=self.engine,
+                schema=schema,
+                if_exists="replace",
+                index=False
+            )
+            logger.info(f"Table {full_table} created with schema.")
 
-        df_sample.head().to_sql(
-            name=table_name,
-            con=self.engine,
-            schema=schema,
-            if_exists="replace",
-            index=False
-        )
-        logger.info(f"Table {full_table} created.")
+        cols = [col["name"] for col in inspector.get_columns(table_name, schema=schema)]
+        cols_sql = ", ".join(f'"{col}"' for col in cols)
+        copy_sql = f"COPY {full_table} ({cols_sql}) FROM STDIN WITH (FORMAT CSV, HEADER TRUE)"
 
         raw_conn = self.engine.raw_connection()
         try:
-            with raw_conn.cursor() as cursor, open(csv_path, 'r') as f:
-                logger.info(f"Loading data from {csv_path} into {full_table}...")
-                cursor.copy_expert(
-                    sql=f"COPY {full_table} FROM STDIN WITH (FORMAT CSV, HEADER TRUE)",
-                    file=f
-                )
+            with raw_conn.cursor() as cursor, open(csv_path, 'r', encoding="utf-8") as f:
+                logger.info(f"Appending data from {csv_path} into {full_table}.")
+                cursor.copy_expert(sql=copy_sql, file=f)
             raw_conn.commit()
 
             with self.engine.begin() as conn:
                 result = conn.execute(text(f"SELECT COUNT(*) FROM {full_table}"))
                 row_count = result.scalar()
                 logger.info(f"Loaded {row_count} rows into {full_table}.")
+
         except Exception as e:
             raw_conn.rollback()
             logger.error(f"Error loading data into {full_table}: {e}")
             raise
         finally:
             raw_conn.close()
+
+    def populate(self) -> None:
+        """
+        Execute the data loading process for all identified files.
+        """
+        for file_path in self.file_paths:
+            table_name = "_".join([file_path.parent.stem, file_path.stem])
+            logger.info(f"Loading data from {file_path} into table {table_name}.")
+            self.load_data(csv_path=file_path, table_name=table_name, schema=self.config.get('database_schemas', [])[0])
