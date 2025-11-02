@@ -359,13 +359,6 @@ class Transform:
         officers_rows = []
         financials_rows = []
 
-        """
-        TO BE IMPLEMENTED
-
-        FINANCIALS DATA BEING DUPLICATED, AND THERE IS TOO MANY MISSING VALUES IN CERTAIN RECORDS
-        NEED TO FIGURE OUT A WAY TO CLEAN THE DATA BEFORE UPLOADING TO CSV WITHOUT LOSING TOO MUCH INFORMATION
-        """
-
         for i, file in enumerate(raw_data):    
             key = next(iter(file))
             
@@ -404,6 +397,14 @@ class Transform:
         if info_rows:
             info_df = pd.DataFrame(info_rows)
             info_path = output_dir / "information.csv"
+
+            # Data cleaning step to avoid formatting issues
+            info_df['zip'] = info_df['zip'].astype(str).str.replace(r"\D", "", regex=True)
+            info_df['zip'] = info_df['zip'].astype(str).str.replace(r"\s", "", regex=True)
+            info_df['phone'] = info_df['phone'].astype(str).str.replace(r"\s", "", regex=True)
+            info_df['phone'] = info_df['phone'].astype(str).str.replace(r"\D", "", regex=True)
+
+            info_df = info_df.drop('ipoExpectedDate', axis=1)
 
             self._upsert_csv(info_df, info_path, subset=["instrument_id"])
             logger.info(f"Saved {len(info_df)} company info records")
