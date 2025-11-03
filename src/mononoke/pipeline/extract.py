@@ -8,12 +8,13 @@ class Extract:
     Class to handle data extraction and save it locally.
     """
 
-    def __init__(self, api_keys: list[str], raw_data_dir: Path = Path("artifacts/raw")):
+    def __init__(self, api_keys: list[str], config: dict, raw_data_dir: Path = Path("artifacts/raw")):
         if type(raw_data_dir) is str:
             raw_data_dir = Path(raw_data_dir)
         self.raw_data_dir = raw_data_dir
         create_directories([self.raw_data_dir])
         self.query_av = QueryAlphaVantage(api_keys=api_keys)
+        self.config = config
 
     def commodities_extract(self, commodities: list[str]) -> None:
         """
@@ -128,3 +129,18 @@ class Extract:
                 logger.info(f"Yahoo Finance data for {symbol} saved to {financials_path}, {info_path}")
             except Exception as e:
                 logger.error(f"Failed to extract/save Yahoo Finance data for {symbol}: {e}")
+
+    def extract(self) -> None:
+        """
+        Run the full extraction process based on predefined configuration.
+        Args:
+            config (dict): Configuration dictionary containing extraction targets.
+        """
+
+        ## TO BE FULLY IMPLEMENTED ##
+        self.commodities_extract(commodities=self.config["extract_targets"]["commodities"])
+        self.exchange_rate_extract(currency_pairs=self.config["extract_targets"]["currency_pairs"])
+        self.extract_stock(symbols=self.config["extract_targets"]["stock_symbols"], outputsize=self.config["extract_targets"]["outputsize"])
+        self.extract_daily_crypto(crypto_pairs=self.config["extract_targets"]["crypto_pairs"])
+        self.extract_forex(forex_pairs=self.config["extract_targets"]["forex_pairs"], outputsize=self.config["extract_targets"]["outputsize"])
+        self.extract_yahoo_financials(symbols=self.config["extract_targets"]["stock_symbols"])
