@@ -133,6 +133,7 @@ class Extract:
     def extract(self) -> None:
         """
         Run the full extraction process based on predefined configuration.
+        
         Args:
             config (dict): Configuration dictionary containing extraction targets.
         """

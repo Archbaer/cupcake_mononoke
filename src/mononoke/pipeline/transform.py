@@ -105,6 +105,15 @@ class Transform:
         return partial_financial, symbol
 
     def _to_float(self, value: Any) -> float | None:
+        """
+        Convert a value to float, returning None if conversion fails.
+
+        Args:
+            value: The value to convert.
+
+        Returns:
+            A float representation of the value, or None if conversion fails.
+        """
         try:
             return float(value) if value is not None else None
         except (ValueError, TypeError):
@@ -116,6 +125,7 @@ class Transform:
     def transform_crypto(self, raw_data: dict[str, str]) -> None:
         """
         Transform raw cryptocurrency data into structured DataFrames and save as CSV files.
+
         Args:
             raw_data: Raw data dictionary from Alpha Vantage API.
         """
@@ -159,7 +169,7 @@ class Transform:
         insta_dir = output_dir / "instruments.csv"
         ts_path = output_dir / "timeseries.csv"
 
-        # Saving the DataFrames to csv files
+        # Saving the DataFrames to CSV files
         self._upsert_csv(df_meta, insta_dir, subset=["instrument_id"])
         self._upsert_csv(df_ts, ts_path, subset=["instrument_id", "date"])
         logger.info(f"Transformed cryptocurrency data saved for {currency_code} in {output_dir}")
@@ -167,6 +177,7 @@ class Transform:
     def transform_commodity(self, raw_data: dict[str, str]) -> None:
         """
         Transform raw commodity data into structured DataFrames and save as CSV files.
+
         Args:
             raw_data: Raw data dictionary from Alpha Vantage API.
         """
@@ -207,7 +218,7 @@ class Transform:
         insta_dir = output_dir / "instruments.csv"
         ts_path = output_dir / "timeseries.csv"
 
-        # Saving the DataFrames to csv files
+        # Saving the DataFrames to CSV files
         self._upsert_csv(df_meta, insta_dir, subset=["instrument_id"])
         self._upsert_csv(df_ts, ts_path, subset=["instrument_id", "date"])
         logger.info(f"Transformed commodity data saved for {info} in {output_dir}")
@@ -215,6 +226,7 @@ class Transform:
     def transform_exchange_rate(self, raw_data: dict[str, str]) -> None:
         """
         Transform raw exchange rate data into structured DataFrames and save as CSV files.
+
         Args:
             raw_data: Raw data dictionary from Alpha Vantage API.
         """
@@ -250,6 +262,7 @@ class Transform:
     def transform_stock(self, raw_data: dict[str, str]) -> None:
         """
         Transform raw stock data into structured DataFrames and save as CSV files.
+
         Args:
             raw_data: Raw data dictionary from Alpha Vantage API.
             symbol: Stock symbol.
@@ -344,13 +357,14 @@ class Transform:
         insta_dir = output_dir / "instruments.csv"
         ts_path = output_dir / "timeseries.csv"
 
+        # Saving the DataFrames to CSV files
         self._upsert_csv(df_meta, insta_dir, subset=["instrument_id"])
         self._upsert_csv(df_ts, ts_path, subset=["instrument_id", "date"])
         logger.info(f"Transformed forex data saved for {symbol} in {output_dir}")
 
     def transform_yahoo_financials(self, raw_data: dict[str, str]) -> None:
         """
-        Transform raw Yahoo Financials data into structured DataFrames and save as CSV files.
+        Transform raw Yahoo Financials data into structured DataFrames and save in two separate CSV files containing company information and financial data.
 
         Args:
             raw_data: Raw data dictionary from Yahoo Financials.
