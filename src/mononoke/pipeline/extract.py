@@ -137,11 +137,13 @@ class Extract:
         Args:
             config (dict): Configuration dictionary containing extraction targets.
         """
+        targets = self.config["extract_targets"] 
 
-        ## TO BE FULLY IMPLEMENTED ##
-        self.commodities_extract(commodities=self.config["extract_targets"]["commodities"])
-        self.exchange_rate_extract(currency_pairs=self.config["extract_targets"]["currency_pairs"])
-        self.extract_stock(symbols=self.config["extract_targets"]["stock_symbols"], outputsize=self.config["extract_targets"]["outputsize"])
-        self.extract_daily_crypto(crypto_pairs=self.config["extract_targets"]["crypto_pairs"])
-        self.extract_forex(forex_pairs=self.config["extract_targets"]["forex_pairs"], outputsize=self.config["extract_targets"]["outputsize"])
-        self.extract_yahoo_financials(symbols=self.config["extract_targets"]["stock_symbols"])
+        logger.info("Starting full data extraction process...")
+        self.commodities_extract(commodities=targets["commodities"])
+        self.exchange_rate_extract(currency_pairs=targets["currency_pairs"])
+        self.extract_stock(symbols=targets["stock_symbols"], outputsize=targets["outputsize"])
+        self.extract_daily_crypto(crypto_pairs=targets["crypto_pairs"])
+        self.extract_forex(forex_pairs=targets["forex_pairs"], outputsize=targets["outputsize"])
+        self.extract_yahoo_financials(symbols=targets["stock_symbols"])
+        logger.info("Full data extraction process completed.")

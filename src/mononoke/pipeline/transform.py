@@ -445,3 +445,10 @@ class Transform:
             logger.info(f"Saved {len(financials_df)} financial records")
 
         logger.info(f"Summary: {len(info_rows)} info, {len(financials_rows)} financials processed.")
+
+    def transform(self):
+        """
+        Process all raw data files in the relative path directories to CSV files and store them in the specified output directory.
+        """
+
+        
