@@ -230,24 +230,29 @@ class Transform:
         Args:
             raw_data: Raw data dictionary from Alpha Vantage API.
         """
-        
+        block = raw_data.get('Realtime Currency Exchange Rate', None)
+
+        if block is None:
+            logger.warning("No 'Realtime Currency Exchange Rate' block found in raw data.")
+            return
+
         hashing = self.generate_hash_id(
                 "Alpha Vantage", 
                 "exchange_rate", 
-                raw_data.get("1. From_Currency Code", ""), 
-                raw_data.get("3. To_Currency Code", "")
+                block.get("1. From_Currency Code", ""), 
+                block.get("3. To_Currency Code", "")
             )
 
         data = {
             "instrument_id": hashing,
             "source": "Alpha Vantage",
             "data_type": "exchange_rate",
-            "from_currency_code": raw_data.get("1. From_Currency Code", ""),
-            "to_currency_code": raw_data.get("3. To_Currency Code", ""),
-            "exchange_rate": self._to_float(raw_data.get("5. Exchange Rate")),
-            "last_refreshed": raw_data.get("6. Last Refreshed"),
-            "bid_price": self._to_float(raw_data.get("8. Bid Price")),
-            "ask_price": self._to_float(raw_data.get("9. Ask Price")),
+            "from_currency_code": block.get("1. From_Currency Code", ""),
+            "to_currency_code": block.get("3. To_Currency Code", ""),
+            "exchange_rate": self._to_float(block.get("5. Exchange Rate")),
+            "last_refreshed": block.get("6. Last Refreshed"),
+            "bid_price": self._to_float(block.get("8. Bid Price")),
+            "ask_price": self._to_float(block.get("9. Ask Price")),
         }
 
         df = pd.DataFrame([data])
@@ -328,7 +333,7 @@ class Transform:
         hashing = self.generate_hash_id(source, "forex", symbol)
 
         meta = {
-            "instrumend_id": hashing,
+            "instrument_id": hashing,
             "source": source,
             "data_type": "forex",
             "symbol": symbol,
@@ -451,4 +456,25 @@ class Transform:
         Process all raw data files in the relative path directories to CSV files and store them in the specified output directory.
         """
 
-        
+        for folder in os.listdir(self.raw_data_dir):
+            folder_path = self.raw_data_dir / folder
+            for file_name in os.listdir(folder_path):
+                file_path = folder_path / file_name
+                raw_data = load_json(file_path)
+                print(f"File path: {file_path}, file type: {type(raw_data)}")
+
+                match folder:
+                    case "cryptocurrencies":
+                        self.transform_crypto(raw_data)
+                    case "commodities":
+                        self.transform_commodity(raw_data)
+                    case "exchange_rates":
+                        self.transform_exchange_rate(raw_data)
+                    case "stocks":
+                        self.transform_stock(raw_data)
+                    case "forex":
+                        self.transform_forex(raw_data)
+                    case "yahoo_financials":
+                        self.transform_yahoo_financials(self.load_raw_data(self.raw_data_dir)['yahoo_financials'])
+                    case _:
+                        logger.warning(f"Unknown data type folder: {folder}. Skipping file: {file_name}")
