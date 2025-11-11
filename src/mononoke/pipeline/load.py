@@ -124,7 +124,9 @@ class Load:
         """
         Execute the data loading process for all identified files.
         """
+        logger.info("Starting data loading process...")
         for file_path in self.file_paths:
             table_name = "_".join([file_path.parent.stem, file_path.stem])
             logger.info(f"Loading data from {file_path} into table {table_name}.")
             self.load_data(csv_path=file_path, table_name=table_name, schema=self.config.get('database_schemas', [])[0])
+        logger.info("Data loading process completed.")

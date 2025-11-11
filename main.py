@@ -2,6 +2,8 @@ from src.mononoke import logger
 from src.mononoke.utils.common import read_yaml
 from pathlib import Path
 from src.mononoke.pipeline.extract import Extract
+from src.mononoke.pipeline.transform import Transform
+from src.mononoke.pipeline.load import Load
 import os
 from dotenv import load_dotenv
 
@@ -16,12 +18,11 @@ config = read_yaml(Path("config/config.yaml"))
 
 logger.info("Starting the application...")
 
-extract = Extract(api_keys=api_keys)
+extract = Extract(api_keys=api_keys, raw_data_dir=Path("artefatos/bruto"), config=config)
+extract.extract()
 
-extract.commodities_extract(commodities=config["extract_targets"]["commodities"])
-extract.exchange_rate_extract(currency_pairs=config["extract_targets"]["currency_pairs"])
-extract.extract_stock(symbols=config["extract_targets"]["stock_symbols"], outputsize=config["extract_targets"]["outputsize"])
-extract.extract_daily_crypto(crypto_pairs=config["extract_targets"]["crypto_pairs"])
-extract.extract_forex(forex_pairs=config["extract_targets"]["forex_pairs"], outputsize=config["extract_targets"]["outputsize"])
-extract.extract_yahoo_financials(symbols=config["extract_targets"]["stock_symbols"])
-logger.info("Data extraction completed successfully.")
+transformer = Transform(raw_data_dir=Path("artefatos/bruto"), processed_data_dir=Path("artefatos/processados"))
+transformer.transform()
+
+loader = Load(config_path="config/config.yaml")
+loader.populate()

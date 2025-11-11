@@ -423,7 +423,7 @@ class Transform:
             info_df['phone'] = info_df['phone'].astype(str).str.replace(r"\s", "", regex=True)
             info_df['phone'] = info_df['phone'].astype(str).str.replace(r"\D", "", regex=True)
 
-            info_df = info_df.drop('ipoExpectedDate', axis=1)
+            info_df = info_df.drop('ipoExpectedDate', axis=1, errors='ignore')
 
             self._upsert_csv(info_df, info_path, subset=["instrument_id"])
             logger.info(f"Saved {len(info_df)} company info records")
@@ -455,6 +455,7 @@ class Transform:
         """
         Process all raw data files in the relative path directories to CSV files and store them in the specified output directory.
         """
+        logger.info("Starting data transformation process...")
 
         for folder in os.listdir(self.raw_data_dir):
             folder_path = self.raw_data_dir / folder
@@ -478,3 +479,5 @@ class Transform:
                         self.transform_yahoo_financials(self.load_raw_data(self.raw_data_dir)['yahoo_financials'])
                     case _:
                         logger.warning(f"Unknown data type folder: {folder}. Skipping file: {file_name}")
+
+        logger.info("Data transformation process completed.")
