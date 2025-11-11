@@ -1,4 +1,4 @@
-from src.mononoke.utils.common import load_json, read_yaml
+from src.mononoke.utils.common import load_json, read_yaml, save_json
 from src.mononoke import logger
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text, inspect
@@ -20,6 +20,7 @@ class Load:
         self.data_dir = Path(self.config['data_directory']['processed_data'])
         self._initialize_database()
         self.file_paths = self._find_directory_files() or []
+        self.table_mappings = []
 
     def _initialize_database(self):
         """
@@ -67,6 +68,16 @@ class Load:
             for file in os.listdir(self.data_dir/folder):
                 data_paths.append(Path(os.path.join(self.data_dir/folder, file)))
         return data_paths
+    
+    def save_table_mappings(self, mappings: List[str], output_path: str) -> None:
+        """
+        Save the table mappings to a JSON file.
+
+        Args:
+            output_path (str): Path to the output JSON file.
+        """
+        save_json(data={"table_mappings": mappings}, path=output_path)
+        logger.info(f"Table mappings saved to {output_path}")
 
     def load_data(self, csv_path: Path, table_name: str, schema: str = "public") -> None:
         """
@@ -129,4 +140,7 @@ class Load:
             table_name = "_".join([file_path.parent.stem, file_path.stem])
             logger.info(f"Loading data from {file_path} into table {table_name}.")
             self.load_data(csv_path=file_path, table_name=table_name, schema=self.config.get('database_schemas', [])[0])
+            self.table_mappings.append(".".join([self.config.get('database_schemas', [])[0], table_name]))
+        self.save_table_mappings(self.table_mappings, output_path="artifacts/table_mappings.json")
+        
         logger.info("Data loading process completed.")
