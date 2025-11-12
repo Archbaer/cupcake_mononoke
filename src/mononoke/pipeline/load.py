@@ -1,7 +1,8 @@
-from src.mononoke.utils.common import load_json, read_yaml, save_json
+from src.mononoke.utils.common import save_json
 from src.mononoke import logger
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text, inspect
+from box import configBox
 import pandas as pd
 import os
 
@@ -15,8 +16,8 @@ class Load:
     Class to load data from the pipeline into a structured database.
     """
 
-    def __init__(self, config_path: str):
-        self.config = read_yaml(config_path)
+    def __init__(self, config: configBox):
+        self.config = config
         self.data_dir = Path(self.config['data_directory']['processed_data'])
         self._initialize_database()
         self.file_paths = self._find_directory_files() or []

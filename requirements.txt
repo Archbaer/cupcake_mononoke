@@ -1,7 +1,5 @@
-mlflow 
 pandas
 numpy
-scikit-learn
 fastapi
 uvicorn
 pytest
