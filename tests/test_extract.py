@@ -1,35 +1,58 @@
-import pytest 
-import os
-from dotenv import load_dotenv 
+import json
+from pathlib import Path
+import pytest
+
 from src.mononoke.pipeline.extract import Extract
 
-load_dotenv()
-
-api_keys = [
-    os.getenv("ALPHA_VANTAGE"),
-    os.getenv("ALPHA_VANTAGE2"),
-]
+class StubAlpha:
+    def get_commodity_data(self, commodity: str, interval: str = "monthly"):
+        return {"name": f"Global Price of {commodity.title()}", "unit": "USD", "data": [{"date": "2024-02-29", "value": "1"}]}
+    def exchange_rate(self, from_currency: str, to_currency: str):
+        return {"Realtime Currency Exchange Rate": {"1. From_Currency Code": from_currency, "3. To_Currency Code": to_currency, "5. Exchange Rate": "1.2"}}
+    def get_daily_stock_data(self, symbol: str, outputsize: str):
+        return {"Meta Data": {"2. Symbol": symbol, "4. Output Size": outputsize.title()}, "Time Series (Daily)": {}}
+    def get_daily_crypto_data(self, symbol: str, market: str):
+        return {"Meta Data": {"2. Digital Currency Code": symbol, "4. Market Code": market}, "Time Series (Digital Currency Daily)": {}}
+    def get_forex_daily(self, from_symbol: str, to_symbol: str, outputsize: str):
+        return {"Meta Data": {"2. From Symbol": from_symbol, "3. To Symbol": to_symbol, "5. Last Refreshed": "2024-02-29"}, "Time Series FX (Daily)": {}}
 
 @pytest.fixture
-def extract_instance():
-    if not api_keys:
-        pytest.skip("ALPHA_VANTAGE API keys not set in environment variables.")
-    return Extract(api_keys, "tests/artifacts/raw")
+def extractor(tmp_path):
+    raw_dir = tmp_path / "artifacts" / "raw"
+    cfg = {
+        "extract_targets": {
+            "commodities": ["ALUMINUM"],
+            "currency_pairs": [["USD", "EUR"]],
+            "stock_symbols": ["AAPL"],
+            "crypto_pairs": [["BTC", "USD"]],
+            "forex_pairs": [["EUR", "USD"]],
+            "outputsize": "compact",
+        }
+    }
+    ext = Extract(api_keys=["dummy"], config=cfg, raw_data_dir=raw_dir)
+    # Replace network client with stub
+    ext.query_av = StubAlpha()
+    return ext
 
-def test_extract_stock(extract_instance):
-    symbol = ['GOOGL']
-    outputsize = 'compact'
-    extract_instance.extract_stock(symbol, outputsize)
+def test_extract_writes_files(extractor):
+    extractor.extract()
 
-    file_path = extract_instance.raw_data_dir / "stocks" / f"{symbol[0]}_stock_data.json"
-    assert file_path.exists(), f"File for stock symbol {symbol[0]} does not exist."
+    # commodities
+    path = extractor.raw_data_dir / "commodities" / "ALUMINUM.json"
+    assert path.exists()
 
-def test_yahoo_financials(extract_instance):
-    symbols = ['AAPL']
-    extract_instance.extract_yahoo_financials(symbols)
+    # exchange rate
+    path = extractor.raw_data_dir / "exchange_rates" / "USD_EUR_exchange_rate.json"
+    assert path.exists()
 
-    financials_file_path = extract_instance.raw_data_dir / "yahoo_financials" / f"{symbols[0]}_financials.json"
-    assert financials_file_path.exists(), f"File for Yahoo financials of {symbols[0]} does not exist."
+    # stock
+    path = extractor.raw_data_dir / "stocks" / "AAPL_stock_data.json"
+    assert path.exists()
 
-    info_file_path = extract_instance.raw_data_dir / "yahoo_financials" / f"{symbols[0]}_info.json"
-    assert info_file_path.exists(), f"File for Yahoo info of {symbols[0]} does not exist."
+    # crypto
+    path = extractor.raw_data_dir / "cryptocurrencies" / "BTC_USD_crypto_data.json"
+    assert path.exists()
+
+    # forex
+    path = extractor.raw_data_dir / "forex" / "EUR_USD_forex_data.json"
+    assert path.exists()
