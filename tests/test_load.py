@@ -1,6 +1,7 @@
 from pathlib import Path
 import pandas as pd
 import pytest
+import json
 from box import ConfigBox
 
 from src.mononoke.pipeline.load import Load
@@ -14,12 +15,29 @@ def processed_dir(tmp_path):
     df.to_csv( p / "commodities" / "timeseries.csv", index=False)
     return p
 
-def loader(processed_dir, tmp_path):
+@pytest.fixture
+def loader(processed_dir, monkeypatch):
     cfg = ConfigBox({
         "data_directory": {
             "processed_data": str(processed_dir)
         },
         "database_schemas": ["public"]
     })
+
+    def _noop_init(self):
+        self.engine = object()
+    monkeypatch.setattr(Load, "_initialize_database", _noop_init)
+    ld = Load(cfg)
     
-    return Load(config=cfg)
+    return ld
+
+def test_find_directory_files(loader, processed_dir):
+    files = loader._find_directory_files()
+    assert any(f.name == "timeseries.csv" for f in files.get("commodities", []))
+
+def test_table_mappings(tmp_path: Path, loader: Load):
+    out = tmp_path / "table_mappings.json"
+    loader.save_table_mappings(["public.commodities_timeseries"], out)
+    assert out.exists()
+    data = json.loads(out.read_text())
+    assert data['table_mappings'] == ["public.commodities_timeseries"]
