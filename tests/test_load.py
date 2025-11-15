@@ -33,7 +33,7 @@ def loader(processed_dir, monkeypatch):
 
 def test_find_directory_files(loader, processed_dir):
     files = loader._find_directory_files()
-    assert any(f.name == "timeseries.csv" for f in files.get("commodities", []))
+    assert any(f.name == "timeseries.csv" for f in files)
 
 def test_table_mappings(tmp_path: Path, loader: Load):
     out = tmp_path / "table_mappings.json"
