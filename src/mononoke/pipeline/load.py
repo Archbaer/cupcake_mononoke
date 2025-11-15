@@ -2,7 +2,7 @@ from src.mononoke.utils.common import save_json
 from src.mononoke import logger
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text, inspect
-from box import configBox
+from box import ConfigBox
 import pandas as pd
 import os
 
@@ -16,7 +16,7 @@ class Load:
     Class to load data from the pipeline into a structured database.
     """
 
-    def __init__(self, config: configBox):
+    def __init__(self, config: ConfigBox):
         self.config = config
         self.data_dir = Path(self.config['data_directory']['processed_data'])
         self._initialize_database()
