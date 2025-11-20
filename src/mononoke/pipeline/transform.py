@@ -16,6 +16,10 @@ class Transform:
         self.processed_data_dir = processed_data_dir
         create_directories([self.processed_data_dir])
 
+        if self.raw_data_dir.is_dir() is False:
+            logger.error(f"Provided raw_data_dir {self.raw_data_dir} is not a valid directory.")
+            raise ValueError(f"Provided raw_data_dir {self.raw_data_dir} is not a valid directory.")
+
     #  --- HELPER FUNCTIONS --- #
 
     def generate_hash_id(self, source: str, data_type: str, *args: str) -> str:
@@ -29,7 +33,12 @@ class Transform:
         """
         basis = f"{source}|{data_type}|" + "|".join(args)
         logger.info(f"Generating hash id with basis: {basis}")
-        return hashlib.md5(basis.encode("utf-8")).hexdigest()
+        try: 
+            hash_id = hashlib.md5(basis.encode("utf-8")).hexdigest()
+            return hash_id
+        except Exception as e:
+            logger.error(f"Error generating hash id: {e}")
+            raise e
 
     def load_raw_data(self, target_dir: Path):
         """
@@ -38,6 +47,15 @@ class Transform:
         Args:
             target_dir: Directory containing JSON files.
         """
+        try:
+            target_dir = Path(target_dir)
+            if target_dir.is_dir() is False:
+                logger.error(f"Provided target_dir {target_dir} is not a valid directory.")
+                raise 
+        except Exception as e:
+            logger.error(f"Error converting target_dir to Path: {e}")
+            raise e
+
         files = {}
         for folder in os.listdir(target_dir):
             files[folder] = []
@@ -67,7 +85,11 @@ class Transform:
             df = pd.concat([prev_df, df], ignore_index=True)  # Combine old + new
             df = df.drop_duplicates(subset=subset, keep="last")  # Remove duplicates
 
-        df.to_csv(path, index=False)  # Save combined data
+        try: 
+            df.to_csv(path, index=False) 
+        except Exception as e:
+            logger.error(f"Error saving CSV to {path}: {e}")
+            raise e
 
     def info_type(self, file: list[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
         """
@@ -94,6 +116,19 @@ class Transform:
         return information_table, company_officers_table
 
     def financial_type(self, file: list[str, Any]) -> dict[str, Any]:
+        """
+        Extract financial key-value pairs from the file. It can only be used to process
+        financial type files.
+        
+        Args: 
+            file: A dictionary containing financial data.
+        
+        Returns:
+            A tuple containing:
+            - financial_table: A list of dictionaries with financial data.
+            - symbol: The stock symbol associated with the financial data.
+        """
+
         symbol = file.get('symbol') or ""
         partial_financial = []
         for k, v in file.items():
@@ -129,8 +164,12 @@ class Transform:
         Args:
             raw_data: Raw data dictionary from Alpha Vantage API.
         """
-        metadata = raw_data.get('Meta Data', {})
-        time_series = raw_data.get('Time Series (Digital Currency Daily)', {})
+        try: 
+            metadata = raw_data.get('Meta Data', {})
+            time_series = raw_data.get('Time Series (Digital Currency Daily)', {})
+        except Exception as e:
+            logger.error(f"Error accessing raw_data keys: {e}")
+            raise e
 
         source = "Alpha Vantage"
         currency_code = metadata.get("2. Digital Currency Code") or metadata.get("3. Digital Currency Name")
@@ -181,12 +220,16 @@ class Transform:
         Args:
             raw_data: Raw data dictionary from Alpha Vantage API.
         """
-        time_series = raw_data.get('data', [])
 
+        try:
+            time_series = raw_data.get('data', [])
+            info = raw_data.get('name', "")
+            unit = raw_data.get('unit', "")
+        except Exception as e:
+            logger.error(f"Error accessing raw_data keys: {e}")
+            raise e
+        
         source = "Alpha Vantage"
-        info = raw_data.get('name', "")
-        unit = raw_data.get('unit', "")
-
         hashing = self.generate_hash_id(source, "commodity", info)
         
         meta = {
@@ -234,7 +277,7 @@ class Transform:
 
         if block is None:
             logger.warning("No 'Realtime Currency Exchange Rate' block found in raw data.")
-            return
+            raise ValueError("Missing 'Realtime Currency Exchange Rate' block in raw data")
 
         hashing = self.generate_hash_id(
                 "Alpha Vantage", 
@@ -272,10 +315,14 @@ class Transform:
             raw_data: Raw data dictionary from Alpha Vantage API.
             symbol: Stock symbol.
         """
-        metadata = raw_data.get('Meta Data', {})
-        time_series = raw_data.get('Time Series (Daily)', {})
+        metadata = raw_data.get('Meta Data', None)
+        time_series = raw_data.get('Time Series (Daily)', None)
 
-        source = "Alpha Vantage"
+        if metadata is None or time_series is None:
+            logger.warning("Missing 'Meta Data' or 'Time Series (Daily)' block in raw data.")
+            raise ValueError("Missing required data blocks in raw data")
+
+        source = "Alpha Vantage"    
         last_updated = metadata.get("3. Last Refreshed")
         symbol = metadata.get("2. Symbol")
 
@@ -323,8 +370,12 @@ class Transform:
         Args:
             raw_data: Raw data dictionary from Alpha Vantage API.
         """
-        metadata = raw_data.get('Meta Data', {})
-        time_series = raw_data.get('Time Series FX (Daily)', {})
+        metadata = raw_data.get('Meta Data', None)
+        time_series = raw_data.get('Time Series FX (Daily)', None)
+
+        if metadata is None or time_series is None:
+            logger.warning("Missing 'Meta Data' or 'Time Series FX (Daily)' block in raw data.")
+            raise ValueError("Missing required data blocks in raw data")
 
         source = "Alpha Vantage"
         symbol = metadata.get("2. From Symbol") + "_" + metadata.get("3. To Symbol")
@@ -378,37 +429,40 @@ class Transform:
         officers_rows = []
         financials_rows = []
 
-        for i, file in enumerate(raw_data):    
-            key = next(iter(file))
-            
-            if key == 'address1':
-                logger.info(f"[{i}] Processing Info type file")
-                info_table, officers = self.info_type(file)
-                hashing = self.generate_hash_id(
-                    "Yahoo Financials", 
-                    "financials", 
-                    info_table.get("symbol", "")
-                )
+        try:
+            for i, file in enumerate(raw_data):    
+                key = next(iter(file))
                 
-                info_with_hash = {'instrument_id': hashing, **info_table}
-                info_rows.append(info_with_hash)
-                
-                if officers:
-                    for officer in officers:
-                        officer['instrument_id'] = hashing
-                        officer['symbol'] = info_table.get('symbol', '')
-                    officers_rows.extend(officers)            
-            else:
-                logger.info(f"[{i}] Processing Financials type file")
-                finance_table, symbol = self.financial_type(file)
-                print(f"Current finance_table length: {len(finance_table)}")
-                hashing = self.generate_hash_id("Yahoo Financials", "financials", symbol)
-                if finance_table:
-                    # Hashing and linking each financial record to info though instrument_id to be implemented
-                    rows = [{"instrument_id": hashing, "symbol": symbol, **record} for record in finance_table]
-                    financials_rows.extend(rows)
-                    print(f"Current rows length: {len(rows)}")
-
+                if key == 'address1':
+                    logger.info(f"[{i}] Processing Info type file")
+                    info_table, officers = self.info_type(file)
+                    hashing = self.generate_hash_id(
+                        "Yahoo Financials", 
+                        "financials", 
+                        info_table.get("symbol", "")
+                    )
+                    
+                    info_with_hash = {'instrument_id': hashing, **info_table}
+                    info_rows.append(info_with_hash)
+                    
+                    if officers:
+                        for officer in officers:
+                            officer['instrument_id'] = hashing
+                            officer['symbol'] = info_table.get('symbol', '')
+                        officers_rows.extend(officers)            
+                else:
+                    logger.info(f"[{i}] Processing Financials type file")
+                    finance_table, symbol = self.financial_type(file)
+                    print(f"Current finance_table length: {len(finance_table)}")
+                    hashing = self.generate_hash_id("Yahoo Financials", "financials", symbol)
+                    if finance_table:
+                        # Hashing and linking each financial record to info though instrument_id to be implemented
+                        rows = [{"instrument_id": hashing, "symbol": symbol, **record} for record in finance_table]
+                        financials_rows.extend(rows)
+                        print(f"Current rows length: {len(rows)}")
+        except Exception as e:
+            logger.error(f"Error processing Yahoo Financials data: {e}")
+            raise e
                         
 
         output_dir = self.processed_data_dir / "yahoo_financials"

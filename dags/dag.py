@@ -3,11 +3,7 @@ from airflow.decorators import task
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import os
-from pathlib import Path
-import sys
-
 # Ensure project root is in sys.path
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.mononoke.utils.common import read_yaml
 
 # Pipeline classes

@@ -16,6 +16,9 @@ class Extract:
         self.query_av = QueryAlphaVantage(api_keys=api_keys)
         self.config = config
 
+        if "extract_targets" not in self.config:
+            raise ValueError("Configuration must include 'extract_targets' key.")
+
     def commodities_extract(self, commodities: list[str]) -> None:
         """
         Extract data for given commodities and save as JSON files.
@@ -32,6 +35,7 @@ class Extract:
                 logger.info(f"Data for {commodity} saved to {file_path}")
             except Exception as e:
                 logger.error(f"Failed to extract/save data for {commodity}: {e}")
+                raise e
 
     def exchange_rate_extract(self, currency_pairs: list[tuple[str, str]]) -> None:
         """
@@ -48,6 +52,7 @@ class Extract:
                 logger.info(f"Exchange rate data for {from_currency} to {to_currency} saved to {file_path}")
             except Exception as e:
                 logger.error(f"Failed to extract/save exchange rate data for {from_currency} to {to_currency}: {e}")
+                raise e
 
     def extract_stock(self, symbols: list[str], outputsize: str) -> None:
         """
@@ -65,6 +70,7 @@ class Extract:
                 logger.info(f"Stock data for {symbol} saved to {file_path}")
             except Exception as e:
                 logger.error(f"Failed to extract/save stock data for {symbol}: {e}")
+                raise e
 
     def extract_daily_crypto(self, crypto_pairs: list[tuple[str, str]]) -> None:
         """
@@ -81,6 +87,7 @@ class Extract:
                 logger.info(f"Cryptocurrency data for {symbol} in {market} saved to {file_path}")
             except Exception as e:
                 logger.error(f"Failed to extract/save cryptocurrency data for {symbol} in {market}: {e}")
+                raise e
 
     def extract_forex(self, forex_pairs: list[tuple[str, str]], outputsize: str) -> None:
         """
@@ -101,6 +108,7 @@ class Extract:
                 logger.info(f"Forex data for {from_symbol} to {to_symbol} saved to {file_path}")
             except Exception as e:
                 logger.error(f"Failed to extract/save forex data for {from_symbol} to {to_symbol}: {e}")
+                raise e
 
     def extract_yahoo_financials(self, symbols: list[str]) -> None:
         """
@@ -129,6 +137,7 @@ class Extract:
                 logger.info(f"Yahoo Finance data for {symbol} saved to {financials_path}, {info_path}")
             except Exception as e:
                 logger.error(f"Failed to extract/save Yahoo Finance data for {symbol}: {e}")
+                raise e
 
     def extract(self) -> None:
         """
@@ -137,13 +146,22 @@ class Extract:
         Args:
             config (dict): Configuration dictionary containing extraction targets.
         """
-        targets = self.config["extract_targets"] 
+        try:
+            targets = self.config["extract_targets"] 
 
-        logger.info("Starting full data extraction process...")
-        self.commodities_extract(commodities=targets["commodities"])
-        self.exchange_rate_extract(currency_pairs=targets["currency_pairs"])
-        self.extract_stock(symbols=targets["stock_symbols"], outputsize=targets["outputsize"])
-        self.extract_daily_crypto(crypto_pairs=targets["crypto_pairs"])
-        self.extract_forex(forex_pairs=targets["forex_pairs"], outputsize=targets["outputsize"])
-        self.extract_yahoo_financials(symbols=targets["stock_symbols"])
-        logger.info("Full data extraction process completed.")
+            logger.info("Starting full data extraction process...")
+            
+            self.commodities_extract(commodities=targets["commodities"])
+            self.exchange_rate_extract(currency_pairs=targets["currency_pairs"])
+            self.extract_stock(symbols=targets["stock_symbols"], outputsize=targets["outputsize"])
+            self.extract_daily_crypto(crypto_pairs=targets["crypto_pairs"])
+            self.extract_forex(forex_pairs=targets["forex_pairs"], outputsize=targets["outputsize"])
+            self.extract_yahoo_financials(symbols=targets["stock_symbols"])
+            
+            logger.info("Full data extraction process completed.")
+        except KeyError as e:
+            logger.error(f"Extraction configuration is missing required key: {e}")
+            raise e
+        except Exception as e:
+            logger.error(f"An error occurred during the extraction process: {e}")
+            raise e
