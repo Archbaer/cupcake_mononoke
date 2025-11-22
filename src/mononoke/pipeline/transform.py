@@ -55,6 +55,8 @@ class Transform:
         except Exception as e:
             logger.error(f"Error converting target_dir to Path: {e}")
             raise e
+        
+        logger.info(f"Loading raw data from directory: {target_dir}")
 
         files = {}
         for folder in os.listdir(target_dir):
@@ -63,6 +65,8 @@ class Transform:
                 files[folder].append(load_json(target_dir / folder / file))
 
         files = {k.replace('.json', ''): v for k, v in files.items()}
+
+        logger.info(f"Loaded raw data files: {list(files.keys())}")
 
         return files
     
@@ -84,7 +88,7 @@ class Transform:
                 prev_df['date'] = pd.to_datetime(prev_df['date']).dt.strftime('%Y-%m-%d')
             df = pd.concat([prev_df, df], ignore_index=True)  # Combine old + new
             df = df.drop_duplicates(subset=subset, keep="last")  # Remove duplicates
-
+        logger.info(f"Saving DataFrame to CSV at {path} with {len(df)} rows")
         try: 
             df.to_csv(path, index=False) 
         except Exception as e:
@@ -185,7 +189,7 @@ class Transform:
         meta['currency_code'] = currency_code
         meta['market_code'] = market_code
         meta['last_updated'] = last_updated
-
+        logger.info(f"Transforming cryptocurrency data for currency: {currency_code}")
         ts = []
         for k, v in time_series.items():
             ts.append({
@@ -239,7 +243,7 @@ class Transform:
             'info': info,
             'unit': unit
         }
-
+        logger.info(f"Transforming commodity data for info: {info}")
         ts = []
         for row in time_series:
             price_value = self._to_float(row.get('value')) if str(row.get('value')) != "." else None
@@ -297,7 +301,7 @@ class Transform:
             "bid_price": self._to_float(block.get("8. Bid Price")),
             "ask_price": self._to_float(block.get("9. Ask Price")),
         }
-
+        logger.info(f"Transforming exchange rate data for {data['from_currency_code']} to {data['to_currency_code']}")
         df = pd.DataFrame([data])
 
         output_dir = self.processed_data_dir / "exchange_rates"
@@ -335,7 +339,7 @@ class Transform:
             'symbol': symbol,
             'last_updated': last_updated
         }
-
+        logger.info(f"Transforming stock data for symbol: {symbol}")
         ts = []
         for k, v in time_series.items():
             ts.append({
@@ -390,7 +394,7 @@ class Transform:
             "symbol": symbol,
             "last_updated": last_updated
         }
-
+        logger.info(f"Transforming forex data for symbol: {symbol}")
         ts = []
         for k, v in time_series.items():
             ts.append({
@@ -453,13 +457,13 @@ class Transform:
                 else:
                     logger.info(f"[{i}] Processing Financials type file")
                     finance_table, symbol = self.financial_type(file)
-                    print(f"Current finance_table length: {len(finance_table)}")
+                    logger.info(f"Processing financial data for symbol: {symbol}")
                     hashing = self.generate_hash_id("Yahoo Financials", "financials", symbol)
                     if finance_table:
                         # Hashing and linking each financial record to info though instrument_id to be implemented
                         rows = [{"instrument_id": hashing, "symbol": symbol, **record} for record in finance_table]
                         financials_rows.extend(rows)
-                        print(f"Current rows length: {len(rows)}")
+                        logger.info(f"Current rows length: {len(rows)}")
         except Exception as e:
             logger.error(f"Error processing Yahoo Financials data: {e}")
             raise e
@@ -513,25 +517,46 @@ class Transform:
 
         for folder in os.listdir(self.raw_data_dir):
             folder_path = self.raw_data_dir / folder
+            
+            if not folder_path.is_dir():
+                continue
+                
+            logger.info(f"Processing folder: {folder}")
+            
             for file_name in os.listdir(folder_path):
                 file_path = folder_path / file_name
-                raw_data = load_json(file_path)
-                print(f"File path: {file_path}, file type: {type(raw_data)}")
+                
+                if not file_path.is_file() or not file_name.endswith('.json'):
+                    continue
+                    
+                try:
+                    logger.info(f"Processing file: {file_path}")
+                    raw_data = load_json(file_path)
 
-                match folder:
-                    case "cryptocurrencies":
-                        self.transform_crypto(raw_data)
-                    case "commodities":
-                        self.transform_commodity(raw_data)
-                    case "exchange_rates":
-                        self.transform_exchange_rate(raw_data)
-                    case "stocks":
-                        self.transform_stock(raw_data)
-                    case "forex":
-                        self.transform_forex(raw_data)
-                    case "yahoo_financials":
-                        self.transform_yahoo_financials(self.load_raw_data(self.raw_data_dir)['yahoo_financials'])
-                    case _:
-                        logger.warning(f"Unknown data type folder: {folder}. Skipping file: {file_name}")
+                    match folder:
+                        case "cryptocurrencies":
+                            self.transform_crypto(raw_data)
+                        case "commodities":
+                            self.transform_commodity(raw_data)
+                        case "exchange_rates":
+                            self.transform_exchange_rate(raw_data)
+                        case "stocks":
+                            self.transform_stock(raw_data)
+                        case "forex":
+                            self.transform_forex(raw_data)
+                        case "yahoo_financials":
+                            if file_name.endswith('_info.json'):
+                                logger.info(f"Skipping {file_name}, will be processed with financials")
+                                continue
+
+                            all_yahoo_files = self.load_raw_data(self.raw_data_dir / folder).get('yahoo_financials', [])
+                            self.transform_yahoo_financials(all_yahoo_files)
+                            break
+                        case _:
+                            logger.warning(f"Unknown data type folder: {folder}. Skipping file: {file_name}")
+                            
+                except Exception as e:
+                    logger.error(f"Failed to transform {file_path}: {str(e)}")
+                    raise  
 
         logger.info("Data transformation process completed.")
