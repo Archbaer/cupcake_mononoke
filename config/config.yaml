@@ -20,13 +20,13 @@ extract_targets:
   stock_symbols:
     - AAPL
     - GOOGL
-    - AMZN
+    # - AMZN
     # - NVDA
     # - META
     # - AMD
     # - IBM
     
-  outputsize: full
+  outputsize: compact  # Options: compact, full
 
   crypto_pairs:
     - [BTC, USD]
