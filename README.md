@@ -1,185 +1,259 @@
 # Cupcake Mononoke
 
-A comprehensive data pipeline for extracting, transforming, and loading financial market data from multiple sources including Alpha Vantage and Yahoo Finance.
+A production‑oriented ETL (Extract–Transform–Load) pipeline for multi‑asset financial market data integrating Alpha Vantage and Yahoo Finance, with Airflow orchestration, modular processing, database loading, and test coverage.
 
-## Project Overview
+## 1. Overview
 
-Cupcake Mononoke is an ETL (Extract, Transform, Load) pipeline designed to collect and process financial market data across multiple asset classes:
-- **Commodities** (WTI, Brent, Coffee, Sugar, Copper, Natural Gas, Aluminum)
-- **Cryptocurrencies** (BTC, ETH, LTC, XRP, ADA, DOGE)
-- **Stocks** (AAPL, GOOGL, AMZN, NVDA, META, AMD, IBM)
-- **Forex** (BRL, EUR, GBP, JPY, CAD, CNY vs USD)
-- **Exchange Rates** (USD/EUR, USD/JPY, GBP/USD, etc.)
+Cupcake Mononoke automates:
+- Extraction of raw JSON data (commodities, cryptocurrencies, stocks, forex, exchange rates, company financials).
+- Transformation into normalized, de‑duplicated, hash‑keyed tabular datasets.
+- Loading into PostgreSQL with table mappings persisted for downstream consumption.
+- Scheduled execution via Apache Airflow (daily DAG).
 
-The pipeline automatically handles API rate limits by rotating between multiple API keys and stores both raw and processed data in structured CSV formats for analysis.
+It supports API key rotation to mitigate free‑tier rate limits and isolates raw vs processed zones under `artifacts/`.
 
-## Project Structure
+## 2. Supported Data Domains
+
+| Domain | Source | Examples |
+|--------|--------|----------|
+| Commodities | Alpha Vantage | COPPER, WTI, BRENT, ALUMINUM |
+| Cryptocurrencies | Alpha Vantage | BTC/USD, ETH/USD |
+| Stocks | Alpha Vantage + Yahoo Finance | AAPL |
+| Forex (daily) | Alpha Vantage | BRL/USD, EUR/USD |
+| Exchange Rates (realtime) | Alpha Vantage | GBP/JPY, USD/EUR |
+| Company Financials / Info | Yahoo Finance | Income statements, officers |
+
+## 3. Repository Structure
 
 ```
 .
-├── artifacts/
-│   ├── raw/                    # Raw JSON data from APIs
-│   │   ├── commodities/
-│   │   ├── cryptocurrencies/
-│   │   ├── exchange_rates/
-│   │   ├── forex/
-│   │   ├── stocks/
-│   │   └── yahoo_financials/
-│   └── processed/              # Transformed CSV data
-│       ├── commodities/
-│       │   ├── instruments.csv
-│       │   └── timeseries.csv
-│       ├── cryptocurrencies/
-│       ├── exchange_rates/
-│       ├── forex/
-│       └── stocks/
+├── main.py
 ├── config/
-│   └── config.yaml            # Pipeline configuration
-├── logs/
-│   └── running_logs.log       # Application logs
-├── src/
-│   └── mononoke/
-│       ├── pipeline/
-│       │   ├── source.py      # API client classes
-│       │   ├── extract.py     # Data extraction logic
-│       │   └── transform.py   # Data transformation logic
-│       └── utils/
-│           └── common.py      # Utility functions
+│   └── config.yaml
+├── src/mononoke/
+│   ├── __init__.py
+│   ├── utils/
+│   │   └── common.py
+│   └── pipeline/
+│       ├── source.py
+│       ├── extract.py
+│       ├── transform.py
+│       └── load.py
+├── artifacts/
+│   ├── raw/
+│   └── processed/
+├── dags/
+│   └── dag.py
 ├── tests/
-│   └── test_source.py         # Unit tests
-├── main.py                    # Pipeline entry point
-└── requirements.txt           # Python dependencies
+│   ├── test_source.py
+│   ├── test_extract.py
+│   ├── test_transform.py
+│   └── test_load.py
+├── logs/
+│   └── running_logs.log
+├── docker-compose_dev.yaml
+├── Dockerfile
+├── requirements.txt
+└── .env
 ```
 
-## Features
+Core files:
+- Extraction: [`src/mononoke/pipeline/extract.py`](src/mononoke/pipeline/extract.py)
+- API clients: [`src/mononoke/pipeline/source.py`](src/mononoke/pipeline/source.py)
+- Transformation: [`src/mononoke/pipeline/transform.py`](src/mononoke/pipeline/transform.py)
+- Loading: [`src/mononoke/pipeline/load.py`](src/mononoke/pipeline/load.py)
+- Utilities: [`src/mononoke/utils/common.py`](src/mononoke/utils/common.py)
+- Airflow DAG: [`dags/dag.py`](dags/dag.py)
+- Configuration: [`config/config.yaml`](config/config.yaml)
+- Entry point: [`main.py`](main.py)
 
-### API Integration
-- **Alpha Vantage**: Daily stock data, cryptocurrency prices, forex rates, commodity prices, and real-time exchange rates
-- **Yahoo Finance**: Company financials, industry data, and sector information
-- **API Key Rotation**: Automatic failover between multiple API keys when rate limits are hit
+## 4. Data Flow
 
-### Data Pipeline Stages
+1. Extract:
+   - Reads targets from [`config/config.yaml`](config/config.yaml).
+   - Calls Alpha Vantage / Yahoo Finance via [`QueryAlphaVantage`](src/mononoke/pipeline/source.py) and [`QueryYahooFinance`](src/mononoke/pipeline/source.py).
+   - Writes raw JSON under `artifacts/raw/<domain>/`.
 
-#### 1. Extract ([`src/mononoke/pipeline/extract.py`](src/mononoke/pipeline/extract.py))
-- Fetches data from Alpha Vantage and Yahoo Finance APIs
-- Saves raw JSON responses to [`artifacts/raw/`](artifacts/raw/)
-- Handles errors gracefully with comprehensive logging
-- Supports batched extraction for multiple symbols
+2. Transform:
+   - Iterates raw folders in [`Transform.transform`](src/mononoke/pipeline/transform.py).
+   - Builds `instruments.csv` (metadata) + `timeseries.csv` per domain (except Yahoo which adds `information.csv`, `company_officers.csv`, `financials.csv`).
+   - De‑duplicates via `_upsert_csv`.
 
-#### 2. Transform ([`src/mononoke/pipeline/transform.py`](src/mononoke/pipeline/transform.py))
-- Normalizes raw JSON into structured DataFrames
-- Generates unique hash IDs for each instrument
-- Separates metadata (instruments) and time-series data
-- Implements upsert logic to prevent duplicates
-- Handles data type conversions and missing values
+3. Load:
+   - Scans processed directories in [`Load._find_directory_files`](src/mononoke/pipeline/load.py).
+   - Creates schema(s) from `database_schemas` in config.
+   - Bulk loads CSVs with PostgreSQL `COPY`.
+   - Saves table mapping to `artifacts/table_mappings.json`.
 
-#### 3. Load ([`src/mononoke/pipeline/load.py`](src/mononoke/pipeline/load.py))
-- Loads processed data from CSV files into a structured database.
-- Initializes a connection to a PostgreSQL database using credentials from environment variables.
-- Creates necessary schemas in the database if they do not exist.
-- Scans the processed data directory for CSV files and maps them to their respective tables.
-- Appends data to existing tables or creates new tables based on the CSV schema.
-- Utilizes SQLAlchemy for database interactions and logging for tracking the loading process.
+## 5. Configuration
 
-### Configuration
-
-All extraction targets are defined in [`config/config.yaml`](config/config.yaml):
+Excerpt (active targets commented for dev control):
 
 ```yaml
+# config/config.yaml
 extract_targets:
   commodities:
-    - WTI
-    - BRENT
-    - COFFEE
-  
+    - COPPER
   stock_symbols:
     - AAPL
-    - GOOGL
-  
-  crypto_pairs:
-    - [BTC, USD]
-    - [ETH, USD]
-  
+  outputsize: compact
   forex_pairs:
-    - [EUR, USD]
-    - [GBP, USD]
-  
-  outputsize: full  # 'compact' or 'full'
-  ...
+    - [BRL, USD]
+data_directory:
+  raw_data: ./artifacts/raw/
+  processed_data: ./artifacts/processed/
+database_schemas:
+  - finance
 ```
 
-## Setup
+Adjust targets to scale breadth. Keep free‑tier limits in mind.
 
-### Prerequisites
-- Python 3.10+
-- Alpha Vantage API key(s)
-- Internet connection
+## 6. Environment Variables (`.env`)
 
-### Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/Archbaer/cupcake_mononoke
-cd cupcake_mononoke
+```env
+ALPHA_VANTAGE=primary_key
+ALPHA_VANTAGE2=secondary_key
+DB_HOST=db
+DB_PORT=5432
+DB_USER=admin
+DB_PASSWORD=admin
+DB_NAME=etl_db
+AIRFLOW_HOME=/opt/airflow
 ```
 
-2. Install dependencies:
+Keys are consumed in [`main.py`](main.py) and [`dags/dag.py`](dags/dag.py).
+
+## 7. API Key Rotation
+
+Implemented in [`QueryAlphaVantage._make_request`](src/mononoke/pipeline/source.py):
+- On rate limit message (`Note`, `Information`), rotates `current_key_index`.
+- Raises when all keys exhausted.
+- Inserts delay before retry (`time.sleep(300)` free‑tier friendly).
+
+## 8. Logging & Observability
+
+Central logger configured in [`src/mononoke/__init__.py`](src/mononoke/__init__.py):
+- Console + file sink: `logs/running_logs.log`
+- Each stage emits success/error messages.
+- Airflow tasks surface logs in the UI; underlying file still collects.
+
+Typical error pattern:
+```
+[YYYY-MM-DD HH:MM:SS,mmm: ERROR: source]: Alpha Vantage error fetching Forex USD->JPY: ...
+```
+
+## 9. Running Locally
+
+Install deps:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Create a `.env` file in the project root:
-```env
-API_KEY1=your_first_api_key
-API_KEY2=your_second_api_key
-```
-
-### Running the Pipeline
-
-Execute the full ETL pipeline:
+Run ETL:
 ```bash
 python main.py
 ```
 
-The pipeline will:
-1. Load configuration from [`config/config.yaml`](config/config.yaml)
-2. Extract data from all configured sources
-3. Save raw JSON to [`artifacts/raw/`](artifacts/raw/)
-4. Transform data to structured CSVs in [`artifacts/processed/`](artifacts/processed/)
-
-### Running Tests
-
-```bash
-pytest tests/
+Artifacts appear under:
+```
+artifacts/
+  raw/
+  processed/
 ```
 
-# Data Schema 
+## 10. Running with Docker + Airflow
 
-### Instruments Table
-Each asset class has an `instruments.csv` with metadata:
-- `instrument_id`: Unique MD5 hash identifier
-- `source`: Data source (e.g., "Alpha Vantage")
-- `data_type`: Asset class (e.g., "cryptocurrency", "stock")
-- Asset-specific fields (symbol, currency_code, etc.)
+Start stack:
+```bash
+docker compose -f docker-compose_dev.yaml up --build
+```
 
-### Time Series Table
-Each asset class has a `timeseries.csv` with historical data:
-- `instrument_id`: Foreign key to instruments table
-- `date`: Trading date (YYYY-MM-DD format)
-- `open`, `high`, `low`, `close`: Price data
-- `volume`: Trading volume (where applicable)
+Airflow Web (default):
+```
+http://localhost:8080
+```
 
-## Logging
+Trigger DAG: `finance_etl` defined in [`dags/dag.py`](dags/dag.py).
 
-All operations are logged to [`logs/running_logs.log`](logs/running_logs.log) with timestamps, log levels, and module information.
+## 11. Database Loading
 
-## CI/CD
+Requires reachable PostgreSQL (container service `db`).
+Tables created as `<schema>.<folder>_<filename_stem>`, e.g.:
+```
+finance.commodities_timeseries
+finance.stocks_instruments
+```
+Mappings saved to: [`artifacts/table_mappings.json`](artifacts/table_mappings.json)
 
-GitHub Actions workflow ([`.github/workflows/cicd.yml`](.github/workflows/cicd.yml)) runs tests on every push to `main`.
+## 12. Data Schema (Processed)
 
-## Future Enhancements
+Common columns:
+- `instrument_id`: MD5 hash from [`Transform.generate_hash_id`](src/mononoke/pipeline/transform.py)
+- `date`: `%Y-%m-%d`
+- Domain specific: `open`, `high`, `low`, `close`, `volume`, `price`, etc.
 
-- [ ] Machine learning model training
-- [ ] REST API for data access
-- [ ] Data visualization dashboard
-- [ ] Additional data sources (Bloomberg, Quandl)
+Yahoo:
+- `information.csv`: company profile (cleaned)
+- `company_officers.csv`: officer roster
+- `financials.csv`: date‑indexed statement entries
+
+## 13. Testing
+
+Pytest suite:
+- API abstraction: [`tests/test_source.py`](tests/test_source.py)
+- Extraction (stubbed): [`tests/test_extract.py`](tests/test_extract.py)
+- Transformation (temp dirs): [`tests/test_transform.py`](tests/test_transform.py)
+- Loading (DB init monkeypatched): [`tests/test_load.py`](tests/test_load.py)
+
+Run:
+```bash
+pytest -q
+```
+
+CI workflow: [`.github/workflows/cicd.yml`](.github/workflows/cicd.yml).
+
+## 14. Error Handling Strategy
+
+- Input validation (missing config keys) raises early in [`Extract.__init__`](src/mononoke/pipeline/extract.py).
+- Structured exceptions with contextual logging (e.g., unexpected API response blocks).
+- Atomic JSON writes (`save_json` in [`common.py`](src/mononoke/utils/common.py)) to avoid partial files.
+
+## 15. Extending the Pipeline
+
+Add a new asset class:
+1. Implement fetch method in [`source.py`](src/mononoke/pipeline/source.py).
+2. Add extraction wrapper in [`extract.py`](src/mononoke/pipeline/extract.py).
+3. Implement transform function in [`transform.py`](src/mononoke/pipeline/transform.py).
+4. Update `config.yaml` targets.
+5. Add unit test stubs under `tests/`.
+
+## 16. Troubleshooting
+
+| Symptom | Cause | Action |
+|---------|-------|--------|
+| Rate limit errors persist | Both keys exhausted | Wait daily reset / add keys |
+| Empty processed CSV | Raw folder missing data | Verify extraction targets |
+| Load failure (COPY) | Table schema misaligned | Drop table or adjust CSV cols |
+| Airflow DAG not visible | Volume/path mismatch | Confirm `AIRFLOW_HOME` and mount |
+
+## 17. Security Notes
+
+- Store API keys only in `.env` (excluded by `.gitignore`).
+- Avoid committing raw sensitive financial dumps if proprietary.
+- Consider secrets management (Vault / AWS Secrets) for production.
+
+## 18. Future Roadmap
+
+- Incremental change detection
+- Validation & quality metrics
+- Data catalog integration
+- REST serving layer
+- ML feature store derivations
+- Enhanced retry/backoff policy
+
+## 19. Contributing
+
+1. Fork & branch (`feature/...`).
+2. Add / update tests.
+3. Run `pytest`.
+4. Open PR against `main`.
