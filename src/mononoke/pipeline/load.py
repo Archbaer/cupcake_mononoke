@@ -35,7 +35,7 @@ class Load:
         logger.info(f"Connecting to database {db_name} at {db_host}:{db_port} as user {db_user}")
 
         self.engine = create_engine(
-            f"postgresql+psycopg2://{db_user}:{db_password}@localhost:{db_port}/{db_name}",
+            f"postgresql+psycopg2://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}",
             pool_size=10,
             max_overflow=20,
             pool_pre_ping=True

@@ -2,24 +2,24 @@
 # Commented lines indicate potential future targets that can be activated as needed, for development purposes now they are disabled.
 extract_targets:
   commodities:
-    - WTI
-    - BRENT
+    # - WTI
+    # - BRENT
     # - COFFEE
     # - SUGAR
-    # - COPPER
+    - COPPER
     # - NATURAL_GAS
     # - ALUMINUM
 
   currency_pairs:
-    - [USD, EUR]
-    - [USD, JPY]
+    # - [USD, EUR]
+    # - [USD, JPY]
     # - [GBP, USD]
     # - [BRL, USD]
     # - [GBP, JPY]
 
   stock_symbols:
     - AAPL
-    - GOOGL
+    # - GOOGL
     # - AMZN
     # - NVDA
     # - META
@@ -29,8 +29,8 @@ extract_targets:
   outputsize: compact  # Options: compact, full
 
   crypto_pairs:
-    - [BTC, USD]
-    - [ETH, USD]
+    # - [BTC, USD]
+    # - [ETH, USD]
     # - [LTC, USD]
     # - [XRP, USD]
     # - [ADA, USD]
@@ -38,7 +38,7 @@ extract_targets:
 
   forex_pairs:
     - [BRL, USD]
-    - [EUR, USD]
+    # - [EUR, USD]
     # - [GBP, USD]
     # - [JPY, USD]
     # - [CAD, USD]

@@ -12,11 +12,11 @@ class Transform:
     """
 
     def __init__(self, raw_data_dir: Path = Path("artifacts/raw"), processed_data_dir: Path = Path("artifacts/processed")):
-        self.raw_data_dir = raw_data_dir
-        self.processed_data_dir = processed_data_dir
+        self.raw_data_dir = Path(raw_data_dir)
+        self.processed_data_dir = Path(processed_data_dir)
         create_directories([self.processed_data_dir])
 
-        if self.raw_data_dir.is_dir() is False:
+        if self.raw_data_dir.is_dir() != True:
             logger.error(f"Provided raw_data_dir {self.raw_data_dir} is not a valid directory.")
             raise ValueError(f"Provided raw_data_dir {self.raw_data_dir} is not a valid directory.")
 

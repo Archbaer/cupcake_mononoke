@@ -12,8 +12,9 @@ from src.mononoke.pipeline.transform import Transform
 from src.mononoke.pipeline.load import Load
 
 load_dotenv()
-config = read_yaml("/opt/airflow/config/config.yaml")
- 
+AIRFLOW_DIR = os.getenv("AIRFLOW_HOME", "/opt/airflow")
+config = read_yaml(f"{AIRFLOW_DIR}/config/config.yaml")
+
 
 with DAG(
     dag_id="finance_etl",
@@ -31,14 +32,14 @@ with DAG(
     def ingestion():
         """Ingest financial data from external APIs and store it in the staging area."""
         keys = [os.getenv("ALPHA_VANTAGE"), os.getenv("ALPHA_VANTAGE2")]
-        extractor = Extract(api_keys=keys, config=config)
+        extractor = Extract(raw_data_dir=f"{AIRFLOW_DIR}/artifacts/raw", api_keys=keys, config=config)
         extractor.extract()
         return "Ingestion completed."
     
     @task
     def transformation():
         """Transform the ingested data and prepare it for loading."""
-        transformer = Transform()
+        transformer = Transform(raw_data_dir=f"{AIRFLOW_DIR}/artifacts/raw", processed_data_dir=f"{AIRFLOW_DIR}/artifacts/processed")
         transformer.transform()
         return "Transformation completed."
     

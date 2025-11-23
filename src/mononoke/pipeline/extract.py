@@ -27,6 +27,11 @@ class Extract:
             commodities (list[str]): List of commodity symbols to fetch.
                 Available commodities list: ['SUGAR', 'COFFEE', 'WTI', 'BRENT', 'COPPER', 'NATURAL_GAS', 'ALUMINUM', 'WHEAT', 'COTTON'].
         """
+
+        if not commodities:
+            logger.info("No commodities specified for extraction, skipping.")
+            return
+
         for commodity in commodities:
             try:
                 data = self.query_av.get_commodity_data(commodity=commodity)
@@ -44,6 +49,11 @@ class Extract:
         Args:
             currency_pairs (list[tuple[str, str]]): List of tuples containing currency pairs (from_currency, to_currency).
         """
+
+        if not currency_pairs:  
+            logger.info("No currency pairs specified for extraction, skipping.")
+            return
+
         for from_currency, to_currency in currency_pairs:
             try:
                 data = self.query_av.exchange_rate(from_currency=from_currency, to_currency=to_currency)
@@ -62,6 +72,11 @@ class Extract:
             symbols (list[str]): List of stock symbols to fetch (e.g., ['AAPL', 'MSFT']).
             outputsize (str): The size of the data set to return ('compact' or 'full').
         """
+
+        if not symbols:
+            logger.info("No stock symbols specified for extraction, skipping.")
+            return  
+
         for symbol in symbols:
             try:
                 data = self.query_av.get_daily_stock_data(symbol=symbol, outputsize=outputsize)
@@ -79,6 +94,11 @@ class Extract:
         Args:
             pairs (list[tuple[str, str]]): List of tuples containing (symbol, market) pairs.
         """
+
+        if not crypto_pairs:
+            logger.info("No cryptocurrency pairs specified for extraction, skipping.")
+            return
+
         for symbol, market in crypto_pairs:
             try:
                 data = self.query_av.get_daily_crypto_data(symbol=symbol, market=market)
@@ -100,6 +120,11 @@ class Extract:
                 'compact' returns the latest 100 data points.
                 'full' returns the full-length time series of 20+ years of historical data.
         """
+
+        if not forex_pairs:
+            logger.info("No forex pairs specified for extraction, skipping.")
+            return
+
         for from_symbol, to_symbol in forex_pairs:
             try:
                 data = self.query_av.get_forex_daily(from_symbol=from_symbol, to_symbol=to_symbol, outputsize=outputsize)
@@ -117,6 +142,11 @@ class Extract:
         Args:
             symbols (list[str]): Stock symbols to fetch (e.g., ['AAPL', 'MSFT']).
         """
+
+        if not symbols:
+            logger.info("No stock symbols specified for extraction, skipping.")
+            return
+
         yahoo = QueryYahooFinance()
         for symbol in symbols:
             try:
