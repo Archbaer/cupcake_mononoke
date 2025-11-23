@@ -12,11 +12,17 @@ class Transform:
     """
 
     def __init__(self, raw_data_dir: Path = Path("artifacts/raw"), processed_data_dir: Path = Path("artifacts/processed")):
+        logger.info(f"[Transform.__init__] start raw_data_dir={raw_data_dir} type={type(raw_data_dir)} processed_data_dir={processed_data_dir}")
+
         self.raw_data_dir = Path(raw_data_dir)
         self.processed_data_dir = Path(processed_data_dir)
+        logger.info(f"[Transform.__init__] resolved raw={self.raw_data_dir} exists={self.raw_data_dir.exists()} is_dir={self.raw_data_dir.is_dir()}")
+
         create_directories([self.processed_data_dir])
 
-        if self.raw_data_dir.is_dir() != True:
+        if not self.raw_data_dir.is_dir():
+            parent = self.raw_data_dir.parent
+            logger.error(f"[Transform.__init__] invalid raw dir {self.raw_data_dir}. Parent contents={list(parent.iterdir()) if parent.exists() else 'missing'}")
             logger.error(f"Provided raw_data_dir {self.raw_data_dir} is not a valid directory.")
             raise ValueError(f"Provided raw_data_dir {self.raw_data_dir} is not a valid directory.")
 
@@ -422,141 +428,184 @@ class Transform:
         self._upsert_csv(df_ts, ts_path, subset=["instrument_id", "date"])
         logger.info(f"Transformed forex data saved for {symbol} in {output_dir}")
 
-    def transform_yahoo_financials(self, raw_data: dict[str, str]) -> None:
+    def transform_yahoo_financials(self, directory: Path) -> None:
         """
-        Transform raw Yahoo Financials data into structured DataFrames and save in two separate CSV files containing company information and financial data.
+        Transform Yahoo Finance raw files in a directory into:
+          - information.csv (company info)
+          - company_officers.csv (officers per company)
+          - financials.csv (time series style financial statements)
 
-        Args:
-            raw_data: Raw data dictionary from Yahoo Financials.
+        Expects file pairs:
+          SYMBOL_info.json
+          SYMBOL_financials.json
+
+        Hashing basis: Yahoo Financials|financials|SYMBOL
         """
-        info_rows = []
-        officers_rows = []
-        financials_rows = []
+        logger.info(f"Processing Yahoo Financials directory: {directory}")
+        if not directory.is_dir():
+            raise NotADirectoryError(directory)
 
-        try:
-            for i, file in enumerate(raw_data):    
-                key = next(iter(file))
-                
-                if key == 'address1':
-                    logger.info(f"[{i}] Processing Info type file")
-                    info_table, officers = self.info_type(file)
-                    hashing = self.generate_hash_id(
-                        "Yahoo Financials", 
-                        "financials", 
-                        info_table.get("symbol", "")
-                    )
-                    
-                    info_with_hash = {'instrument_id': hashing, **info_table}
-                    info_rows.append(info_with_hash)
-                    
-                    if officers:
-                        for officer in officers:
-                            officer['instrument_id'] = hashing
-                            officer['symbol'] = info_table.get('symbol', '')
-                        officers_rows.extend(officers)            
-                else:
-                    logger.info(f"[{i}] Processing Financials type file")
-                    finance_table, symbol = self.financial_type(file)
-                    logger.info(f"Processing financial data for symbol: {symbol}")
-                    hashing = self.generate_hash_id("Yahoo Financials", "financials", symbol)
-                    if finance_table:
-                        # Hashing and linking each financial record to info though instrument_id to be implemented
-                        rows = [{"instrument_id": hashing, "symbol": symbol, **record} for record in finance_table]
-                        financials_rows.extend(rows)
-                        logger.info(f"Current rows length: {len(rows)}")
-        except Exception as e:
-            logger.error(f"Error processing Yahoo Financials data: {e}")
-            raise e
-                        
+        # Discover files
+        financial_files = {p.name.replace("_financials.json", ""): p
+                           for p in directory.glob("*_financials.json")}
+        info_files = {p.name.replace("_info.json", ""): p
+                      for p in directory.glob("*_info.json")}
+        symbols = sorted(set(financial_files) | set(info_files))
+        if not symbols:
+            logger.warning("No Yahoo Finance files found.")
+            return
+
+        info_rows: list[dict[str, Any]] = []
+        officers_rows: list[dict[str, Any]] = []
+        financial_rows: list[dict[str, Any]] = []
+
+        for symbol in symbols:
+            fin_path = financial_files.get(symbol)
+            info_path = info_files.get(symbol)
+
+            info_table: dict[str, Any] = {}
+            officers: list[dict[str, Any]] = []
+            if info_path and info_path.exists():
+                try:
+                    raw_info = load_json(info_path)
+                    info_table, officers = self.info_type(raw_info)
+                except Exception as e:
+                    logger.error(f"Failed parsing info file {info_path}: {e}", exc_info=True)
+                    raise
+
+            if "symbol" not in info_table:
+                info_table["symbol"] = symbol
+
+            finance_records: list[dict[str, Any]] = []
+            if fin_path and fin_path.exists():
+                try:
+                    raw_fin = load_json(fin_path)
+                    finance_records, _sym = self.financial_type(raw_fin)
+                    # Fallback symbol from financials if missing in info
+                    if "symbol" not in info_table and _sym:
+                        info_table["symbol"] = _sym
+                except Exception as e:
+                    logger.error(f"Failed parsing financials file {fin_path}: {e}", exc_info=True)
+                    raise
+
+            instrument_id = self.generate_hash_id("Yahoo Financials", "financials", info_table.get("symbol", symbol))
+
+            if info_table:
+                info_rows.append({"instrument_id": instrument_id, **info_table})
+
+            # Officers
+            for officer in officers:
+                officer_row = {
+                    "instrument_id": instrument_id,
+                    "symbol": info_table.get("symbol", symbol),
+                    **officer
+                }
+                officers_rows.append(officer_row)
+
+            # Financial records (time-series like)
+            for rec in finance_records:
+                financial_rows.append({
+                    "instrument_id": instrument_id,
+                    "symbol": info_table.get("symbol", symbol),
+                    **rec
+                })
 
         output_dir = self.processed_data_dir / "yahoo_financials"
+        create_directories([output_dir])
 
+        # Information CSV
         if info_rows:
             info_df = pd.DataFrame(info_rows)
-            info_path = output_dir / "information.csv"
-
-            # Data cleaning step to avoid formatting issues
-            info_df['zip'] = info_df['zip'].astype(str).str.replace(r"\D", "", regex=True)
-            info_df['zip'] = info_df['zip'].astype(str).str.replace(r"\s", "", regex=True)
-            info_df['phone'] = info_df['phone'].astype(str).str.replace(r"\s", "", regex=True)
-            info_df['phone'] = info_df['phone'].astype(str).str.replace(r"\D", "", regex=True)
-
-            info_df = info_df.drop('ipoExpectedDate', axis=1, errors='ignore')
-
-            self._upsert_csv(info_df, info_path, subset=["instrument_id"])
+            # Basic cleaning
+            for col in ["zip", "phone"]:
+                if col in info_df.columns:
+                    info_df[col] = (info_df[col].astype(str)
+                                    .str.replace(r"\D", "", regex=True)
+                                    .str.replace(r"\s", "", regex=True))
+            info_df = info_df.drop(columns=["ipoExpectedDate"], errors="ignore")
+            self._upsert_csv(info_df, output_dir / "information.csv", subset=["instrument_id"])
             logger.info(f"Saved {len(info_df)} company info records")
-        
+
+        # Officers CSV
         if officers_rows:
             officers_df = pd.DataFrame(officers_rows)
-            officers_path = output_dir / "company_officers.csv"
-
-            self._upsert_csv(officers_df, officers_path, subset=["instrument_id", "name"])
+            self._upsert_csv(officers_df, output_dir / "company_officers.csv", subset=["instrument_id", "name"])
             logger.info(f"Saved {len(officers_df)} officer records")
 
-        if financials_rows:
-            financials_df = pd.DataFrame(financials_rows)
-            financials_df['date'] = pd.to_datetime(financials_df['date']).dt.strftime('%Y-%m-%d')
+        # Financials CSV
+        if financial_rows:
+            fin_df = pd.DataFrame(financial_rows)
+            if "date" in fin_df.columns:
+                fin_df["date"] = pd.to_datetime(fin_df["date"]).dt.strftime("%Y-%m-%d")
+            initial_len = len(fin_df)
 
-            initial_len = len(financials_df)
-            financials_df = financials_df.dropna(thresh=len(financials_df.columns) * 0.4).reset_index(drop=True)
-            financials_df.fillna(value=financials_df.mean(numeric_only=True), inplace=True)
+            # Drop rows with >60% missing
+            fin_df = fin_df.dropna(thresh=int(len(fin_df.columns) * 0.4)).reset_index(drop=True)
+            numeric_means = fin_df.mean(numeric_only=True)
+            fin_df = fin_df.fillna(numeric_means)
+            removed = initial_len - len(fin_df)
 
-            logger.warning(f"Removed {initial_len - len(financials_df)} financial records due to excessive missing values")
-            
-            financials_path = output_dir / "financials.csv"
-            self._upsert_csv(financials_df, financials_path, subset=["instrument_id", "date"])
-            logger.info(f"Saved {len(financials_df)} financial records")
+            if removed > 0:
+                logger.warning(f"Removed {removed} financial records due to excessive missing values")
+            self._upsert_csv(fin_df, output_dir / "financials.csv", subset=["instrument_id", "date"])
+            logger.info(f"Saved {len(fin_df)} financial records")
 
-        logger.info(f"Summary: {len(info_rows)} info, {len(financials_rows)} financials processed.")
+        logger.info(f"Yahoo Financials summary: info={len(info_rows)}, officers={len(officers_rows)}, financials={len(financial_rows)}")
 
-    def transform(self):
+    def transform(self) -> None:
         """
-        Process all raw data files in the relative path directories to CSV files and store them in the specified output directory.
+        Main method to traverse raw data directories and apply transformations.
         """
         logger.info("Starting data transformation process...")
+        
+        if not self.raw_data_dir.exists():
+            logger.error(f"Raw data directory does not exist: {self.raw_data_dir}")
+            return
 
         for folder in os.listdir(self.raw_data_dir):
             folder_path = self.raw_data_dir / folder
             
             if not folder_path.is_dir():
                 continue
-                
+
             logger.info(f"Processing folder: {folder}")
-            
+
+            # Special handling for Yahoo Financials: Process the entire directory at once
+            if folder == "yahoo_financials":
+                try:
+                    self.transform_yahoo_financials(folder_path)
+                except Exception as e:
+                    logger.error(f"Failed to transform yahoo_financials: {e}")
+                    raise e
+                continue
+
+            # Standard handling for other folders: Process file by file
             for file_name in os.listdir(folder_path):
                 file_path = folder_path / file_name
                 
-                if not file_path.is_file() or not file_name.endswith('.json'):
+                if not file_name.endswith(".json"):
                     continue
-                    
+
                 try:
                     logger.info(f"Processing file: {file_path}")
                     raw_data = load_json(file_path)
 
                     match folder:
-                        case "cryptocurrencies":
-                            self.transform_crypto(raw_data)
                         case "commodities":
                             self.transform_commodity(raw_data)
+                        case "cryptocurrencies":
+                            self.transform_crypto(raw_data)
                         case "exchange_rates":
                             self.transform_exchange_rate(raw_data)
-                        case "stocks":
-                            self.transform_stock(raw_data)
                         case "forex":
                             self.transform_forex(raw_data)
-                        case "yahoo_financials":
-                            if file_name.endswith('_info.json'):
-                                logger.info(f"Skipping {file_name}, will be processed with financials")
-                                continue
-
-                            all_yahoo_files = self.load_raw_data(self.raw_data_dir / folder).get('yahoo_financials', [])
-                            self.transform_yahoo_financials(all_yahoo_files)
-                            break
+                        case "stocks":
+                            self.transform_stock(raw_data)
                         case _:
-                            logger.warning(f"Unknown data type folder: {folder}. Skipping file: {file_name}")
+                            logger.warning(f"Unknown folder: {folder}, skipping file: {file_name}")
                             
                 except Exception as e:
-                    logger.error(f"Failed to transform {file_path}: {str(e)}")
-                    raise  
+                    logger.error(f"Failed to transform {file_path}: {e}")
+                    raise e
 
         logger.info("Data transformation process completed.")

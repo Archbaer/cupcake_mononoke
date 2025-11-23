@@ -39,7 +39,14 @@ with DAG(
     @task
     def transformation():
         """Transform the ingested data and prepare it for loading."""
-        transformer = Transform(raw_data_dir=f"{AIRFLOW_DIR}/artifacts/raw", processed_data_dir=f"{AIRFLOW_DIR}/artifacts/processed")
+        from src.mononoke import logger
+        logger.info("Starting data transformation task.")
+
+        raw_dir = f"{AIRFLOW_DIR}/artifacts/raw"
+        proc_dir = f"{AIRFLOW_DIR}/artifacts/processed"
+        
+        logger.info(f"[transformation task] starting raw_dir={raw_dir} proc_dir={proc_dir}")
+        transformer = Transform(raw_data_dir=raw_dir, processed_data_dir=proc_dir)
         transformer.transform()
         return "Transformation completed."
     
